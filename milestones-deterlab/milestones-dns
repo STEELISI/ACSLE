@@ -1,0 +1,11 @@
+client,dig www.google.com,10\.1\.2\.155
+attacker,ettercap -i -T -M\sarp \/.*\/.*\/,^((?!denied).)*$
+attacker,vi\s etter.dns|vim\s etter.dns|nano etter.dns|pico etter.dns|emacs etter.dns,^((?!denied).)*$
+attacker,ettercap -P\sdns_spoof -i -T -M\sarp \/.*\/.*\/, ^((?!denied).)*$
+client,dig www.google.com,10\.1\.2\.4
+auth,zonesigner -genkeys google.com,^((?!denied).)*$
+auth,vi\s named.conf.options|vim\s named.conf.options|nano named.conf.options|emacs named.conf.options|pico named.conf.options,^((?!denied).)*$
+auth,vi\s named.conf.local|vim\s named.conf.local|nano named.conf.local|emacs named.conf.local|pico named.conf.local,^((?!denied).)*$
+*,dig www.google.com dnssec,RRSIG
+*,dig www.google.com dnskey,DNSKEY
+cache,vi\s named.conf.options|vim\s named.conf.options|nano named.conf.options|emacs named.conf.options|pico named.conf.options,^((?!denied).)*$

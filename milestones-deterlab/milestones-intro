@@ -1,0 +1,7 @@
+*,^find|^locate,/usr/share/pixmaps/xbzf136INTRO-1.jpg
+*,^find|^locate,/dev/136intro-2jjaj.JPEG
+*,^find|^locate,/var/log/136intro-3.jpg
+*,^find|^locate,/etc/wuer136intro-4.JPG
+*,^find|^locate,/.hidden/asdf136Intro-5kqlw.jpeg
+*,cpuinfo$| cpu| vendor,GenuineIntel
+*,^df ,/dev/sda1

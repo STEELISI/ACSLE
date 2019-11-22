@@ -1,0 +1,5 @@
+*,./webserver,Segmentation fault
+*,vim webserver.c|emacs webserver.c|nano webserver.c|pico webserver.c|vi webserver.c,*
+*,^diff webserver.*\.c webserver.*\.c,*
+*,vim .*exploit.*|emacs .*exploit.*|nano .*exploit.*|pico .*exploit.*|vi .*exploit.*,^((?!denied).)*$
+*,vim .*payload.*|emacs .*payload.*|nano .*payload.*|pico .*payload.*,^((?!denied).)*$
