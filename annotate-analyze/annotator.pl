@@ -94,9 +94,7 @@ if ($#ARGV < 2)
     exit(0);
 }
 opendir(my $dh, $ARGV[0]) || die "Can't open $ARGV[0] $!";
-@files = grep { /csv$/ } sort (readdir $dh);
-
-
+@files = sort (readdir $dh);
 
 # Load user files
 # do this in two passes since
@@ -112,6 +110,7 @@ if ($#ARGV == 3 && $ARGV[3] eq "-d")
 
 for $f (@files)
 {
+    print "Reading $f\n";
     $fh = new IO::File($ARGV[0] . "/" . $f);
     $line = "";
     while(<$fh>)

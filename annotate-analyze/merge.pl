@@ -30,6 +30,7 @@ if ($#ARGV < 1)
 }
 $proj = $ARGV[0];
 $dst = $ARGV[1];
+%records = ();
 opendir(my $dh, "/proj/$proj/logs/output_csv") || die "Can't open exp: $!";
 @files = readdir($dh);
 for $f (@files)
@@ -38,18 +39,40 @@ for $f (@files)
     {
 	next;
     }
-    print "File $g\n";
-    if ($g =~ /\.csv$/)
+    print "File $f\n";
+    if ($f =~ /\.csv/)
     {
-	@items = split(/\./, $g);
+	@items = split(/\./, $f);
+	$key = $items[0] . "." . $items[1];
 	$contents = "";
-	my $fh = new IO::File("/proj/$proj/logs/output_csv/$g");
+	$curtime = 0;
+	my $fh = new IO::File("/proj/$proj/logs/output_csv/$f");
 	while(<$fh>)
 	{
+	    if ($_ =~ /^CMBEGIN/)
+	    {
+		if ($curtime > 0)
+		{
+		    $records{$key}{$curtime} = $contents;
+		    $contents = "";
+		}
+		@elems = split(/\,/, $_);
+		$curtime = $elems[2];
+	    }
 	    $contents .= $_;
 	}
-	open(my $oh, '>>', $dst . '/' . $items[0] . "." . $items[2] . '.log');
-	print $oh $contents;
-	close($oh);
+	if ($curtime > 0)
+	{
+	    $records{$key}{$curtime} = $contents;
+	}
     }
+}
+for $key (sort keys %records)
+{
+    open(my $oh, '>>', $dst . '/' . $key  . '.log');
+    for $c (sort {$a <=> $b} keys %{$records{$key}})
+    {
+	print $oh $records{$key}{$c};
+    }
+    close($oh);
 }

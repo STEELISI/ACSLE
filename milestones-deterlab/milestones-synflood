@@ -1,7 +1,0 @@
-server,sysctl net.ipv4.tcp_syncookies$,^net.ipv4.tcp_syncookies = 1$
-client,ip\sroute\sget|ifconfig,*
-client,tcpdump,^((?!denied).)*$
-attacker,flooder --dst\s5.6.7.8 --proto\s6 --dportmin\s80 --dportmax\s80 --src\s1.1.2.0 --srcmask\s255.255.255.0|flooder --dst\sserver\s --proto\s6 --dportmin\s80 --dportmax\s80 --src\s1.1.2.0 --srcmask\s255.255.255.0,^((?!denied).)*$
-server,sysctl -w net.ipv4.tcp_syncookies=0,^net.ipv4.tcp_syncookies = 0$
-client,tcpdump,^((?!denied).)*$
-attacker,flooder --dst\s5.6.7.8 --proto\s6 --dportmin\s80 --dportmax\s80 --src\s1.1.2.0 --srcmask\s255.255.255.0|flooder --dst\sserver\s --proto\s6 --dportmin\s80 --dportmax\s80 --src\s1.1.2.0 --srcmask\s255.255.255.0,^((?!denied).)*$
