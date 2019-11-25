@@ -29,6 +29,7 @@ def backup_previous_experiment_files(logs_path, output_csv_path, user_name, exp,
     time_rename = int(time.time())
 
     #Check the logs_path folder. If there is a file by the name of 'user_name.experiment_name.node_name', rename it.
+    #The variable 'previous_log_name', and 'previous_output_csv_name' stored the naming convention used to store log files
     previous_log_name = r"{}.{}.{}.log".format(user_name, exp, host)
     previous_output_csv_name = r"{}.{}.{}.csv".format(user_name, exp, host)
     if os.path.exists(r"{}{}".format(logs_path, previous_log_name)):
@@ -39,6 +40,7 @@ def backup_previous_experiment_files(logs_path, output_csv_path, user_name, exp,
 
     return 0
 
+#Hostname can be obtained using 'hostname' linux command
 nickname_handle = open(r'/var/emulab/boot/nickname','r')
 nickname = nickname_handle.read()
 nickname_handle.close()
@@ -49,7 +51,9 @@ ttylog_files_path = r'/var/log/ttylog/'
 if not os.path.exists(ttylog_files_path):
     os.system(r'mkdir {}'.format(ttylog_files_path))
 
+#logs_path is the path for storing the result of concatenation of ttylog files for a particular host. Any directory which is accessible after the expriment ends, works fine
 logs_path = r"/proj/{}/logs/ttylog/".format(proj)
+#output_csv_path is the path for storing the final CSV file. Any directory which is accessible after the expriment ends, works fine
 output_csv_path = r"/proj/{}/logs/output_csv/".format(proj)
 
 #If logs_path directory does not exist, create it.
@@ -72,8 +76,10 @@ while True:
 
             if user_name_file not in backed_up_users:
                 backed_up_users.append(user_name_file)
+                #The function 'backup_previous_experiment_files' is used to backup experiments in 'logs_path', and 'output_csv' directory
                 backup_previous_experiment_files(logs_path, output_csv_path, user_name_file, exp, host)
 
+            #A naming convention depending upon testbed can be used for naming log files. This is stored in 'dest_log_name' and 'dest_output_name'
             dest_log_name = r"{}.{}.{}.log".format(user_name_file, exp, host)
             dest_output_name = r"{}.{}.{}.csv".format(user_name_file, exp, host)
             os.system(r"cat {}ttylog.{}.* > {}{}".format(ttylog_files_path, user_name_file, ttylog_files_path, dest_log_name) )

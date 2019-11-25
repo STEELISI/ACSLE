@@ -243,7 +243,9 @@ def sort_ttylog_lines(line):
 
 if __name__ == "__main__":
 
+    #The input ttylog file path is stored in 'ttylog'
     ttylog = sys.argv[1]
+    #The output CSV file path is stored in 'csv_output_file'
     csv_output_file = sys.argv[2]
         # if not os.path.isfile(ttylog):
         #     logging.critical("there's a problem with ttylog! aborting.")

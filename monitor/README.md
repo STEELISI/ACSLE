@@ -1,9 +1,12 @@
-* mkdir /usr/local/src/ttylog
-* cp ~aashraya/work_17_April/*.py /usr/local/src/ (copy analyze.py and pre_process.py)
-* cp ~aashraya/work_17_April/start_ttylog.sh /usr/local/src/
-* cp ~aashraya/work_17_April/ttylog /usr/local/src/ttylog/
-* Append 'ForceCommand /usr/local/src/start_ttylog.sh' to '/etc/ssh/sshd_config'
-* Append 'python3 /usr/local/src/pre_process.py &' to /usr/local/etc/emulab/rc/rc.testbed
+* clone the repository
+* mkdir /usr/local/src/ttylog (Make the directory to store ttylog program)
+* cp ACSLE/monitor/analyze.py /usr/local/src/
+* cp ACSLE/monitor/pre_process.py /usr/local/src/
+* cp ACSLE/monitor/start_ttylog.sh /usr/local/src/
+* cp ACSLE/monitor/script.sh /usr/local/src/
+* cp ACSLE/monitor/ttylog /usr/local/src/ttylog/
+* echo 'ForceCommand /usr/local/src/script.sh' >> /etc/ssh/sshd_config (Start 'script.sh' as soon as a user SSH's in)
+* echo 'python3 /usr/local/src/pre_process.py &' >> /usr/local/etc/emulab/rc/rc.testbed (Launch 'pre_process.py' at system startup)
 * service sshd restart
 * reboot
-* As soon as the node reboots, take the snapshot of the image. Do not SSH into the node. First take the screenshot after rebooting.
+* As soon as the system reboots, take the snapshot of the system. Do not SSH into the node before taking the snapshot.

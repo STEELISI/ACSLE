@@ -41,18 +41,24 @@ if [ -z "$SSH_ORIGINAL_COMMAND" ]; then
 
     TTY_CMD=$(tty)
     TTY=${TTY_CMD:5}
+    #'hostname' command can also be used to obtain hostname
     HN=$(cat /var/emulab/boot/nickname)
+    #Assign the hostname to 'HOST', experiment name to 'EXP', and project name to 'PROJ'
     HOST=$(echo $HN | awk -F. '{print $(NF - 2)}')
     EXP=$(echo $HN | awk -F. '{print $(NF - 1)}')
     PROJ=$(echo $HN | awk -F. '{print $(NF)}')
+    #'whoami' command can be used to obtain username
     USER=$USER
 
     sudo mkdir -p /var/log/ttylog/
-
+    #Checking for the existence for a log file constructed using hostname, project name, and experiment name
+    #A log file constructed using just the hostname will also work fine.
     if sudo [ -e "/proj/$PROJ/exp/$EXP/count.$HOST" ]; then
         CNT=$(sudo cat /proj/$PROJ/exp/$EXP/count.$HOST)
         let CNT++
         echo $CNT | sudo tee /proj/$PROJ/exp/$EXP/count.$HOST > /dev/null
+    #Created a log file consisting of hostname, project name, and experiment name
+    #A log file constructed using just the hostname will also work fine.
     else
         sudo touch /proj/$PROJ/exp/$EXP/count.$HOST
         sudo chmod ugo+rw /proj/$PROJ/exp/$EXP/count.$HOST
