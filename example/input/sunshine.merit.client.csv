@@ -1,0 +1,54 @@
+CMBEGIN,client,1576626486,/users/sunshine,ping server,%PING server-link0 (10.1.1.3) 56(84) bytes of data.
+64 bytes from server-link0 (10.1.1.3): icmp_seq=1 ttl=64 time=0.635 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=2 ttl=64 time=0.416 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=3 ttl=64 time=0.227 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=4 ttl=64 time=0.232 ms
+^C
+--- server-link0 ping statistics ---
+4 packets transmitted, 4 received, 0%% packet loss, time 3070ms
+rtt min/avg/max/mdev = 0.227/0.377/0.635/0.168 ms
+%,sunshine@client
+CMBEGIN,client,1576626502,/users/sunshine,ping -f server,%PING server-link0 (10.1.1.3) 56(84) bytes of data.
+ping: cannot flood; minimal interval allowed for user is 200ms
+%,sunshine@client
+CMBEGIN,client,1576626511,/users/sunshine,sudo ping -f server,%PING server-link0 (10.1.1.3) 56(84) bytes of data.
+.^C
+--- server-link0 ping statistics ---
+2926 packets transmitted, 2925 received, 0%% packet loss, time 1428ms
+rtt min/avg/max/mdev = 0.177/0.438/0.475/0.052 ms, ipg/ewma 0.488/0.395 ms
+%,sunshine@client
+CMBEGIN,client,1576626515,/users/sunshine,exit,%exit
+%,sunshine@client
+CMBEGIN,client,1576626591,/users/sunshine,nstall iperf,%E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)
+E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend), are you root?
+%,sunshine@client
+CMBEGIN,client,1576626593,/users/sunshine,sudo apt-get install iperf,%Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+The following package was automatically installed and is no longer required:
+  python3-netifaces
+Use 'sudo apt autoremove' to remove it.
+The following NEW packages will be installed:
+  iperf
+0 upgraded, 1 newly installed, 0 to remove and 306 not upgraded.
+Need to get 60.5 kB of archives.
+After this operation, 176 kB of additional disk space will be used.
+Get:1 http://scratch/ubuntu bionic-updates/universe amd64 iperf amd64 2.0.10+dfsg1-1ubuntu0.18.04.2 [60.5 kB]
+Fetched 60.5 kB in 0s (4,312 kB/s)
+Selecting previously unselected package iperf.
+(Reading database ... 154834 files and directories currently installed.)
+Preparing to unpack .../iperf_2.0.10+dfsg1-1ubuntu0.18.04.2_amd64.deb ...
+Unpacking iperf (2.0.10+dfsg1-1ubuntu0.18.04.2) ...
+Setting up iperf (2.0.10+dfsg1-1ubuntu0.18.04.2) ...
+Processing triggers for man-db (2.8.3-2ubuntu0.1) ...
+%,sunshine@client
+CMBEGIN,client,1576626609,/users/sunshine,iperf -c server,%------------------------------------------------------------
+Client connecting to server, TCP port 5001
+TCP window size: 85.0 KByte (default)
+------------------------------------------------------------;1576626609
+[  3] local 10.1.1.2 port 38134 connected with 10.1.1.3 port 5001
+^C[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0- 7.8 sec  87.8 MBytes  94.9 Mbits/sec
+%,sunshine@client
+CMBEGIN,client,1576626627,/users/sunshine,exit,%exit
+%,sunshine@client

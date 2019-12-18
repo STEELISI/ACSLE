@@ -1,0 +1,103 @@
+User sunshine start time 1576626486 end 1576626628
+#INPUT|uniqueID|class|time|uid|node:input|output (trunc)
+INPUT|sunshine-example-0|U |000000000|sunshine|:|
+INPUT|sunshine-example-1|U |000000000|sunshine|:|
+INPUT|sunshine-example-2|A0 |1576626486|sunshine|client:ping server|PING server-link0 (10.1.1.3) 56(84) bytes of data.
+64 bytes from server-link0 (10.1.1.3): icmp_seq=1 ttl=64 time=0.635 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=2 ttl=64 time=0.416 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=3 ttl=64 time=0.227 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=4 ttl=64 time=0.232 ms
+^C
+--- server-link0 ping statistics ---
+4 packets transmitted 4 received 0%% packet loss time 3070ms
+rtt min/avg/max/mdev = 0.227/0.377/0.635/0.168 ms
+
+INPUT|sunshine-example-3|A0 |1576626502|sunshine|client:ping -f server|PING server-link0 (10.1.1.3) 56(84) bytes of data.
+ping: cannot flood; minimal interval allowed for user is 200ms
+
+INPUT|sunshine-example-4|M0 |1576626511|sunshine|client:ping -f server|PING server-link0 (10.1.1.3) 56(84) bytes of data.
+.^C
+--- server-link0 ping statistics ---
+2926 packets transmitted 2925 received 0%% packet loss time 1428ms
+rtt min/avg/max/mdev = 0.177/0.438/0.475/0.052 ms ipg/ewma 0.488/0.395 ms
+
+INPUT|sunshine-example-5|U |1576626515|sunshine|client:exit|exit
+
+INPUT|sunshine-example-6|A0 |1576626525|sunshine|server:ping server|PING server-link0 (10.1.1.3) 56(84) bytes of data.
+64 bytes from server-link0 (10.1.1.3): icmp_seq=1 ttl=64 time=0.057 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=2 ttl=64 time=0.026 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=3 ttl=64 time=0.025 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=4 ttl=64 time=0.032 ms
+64 bytes from server-link0 (10.1.1.3): icmp_seq=5 ttl=64 time=0.026 ms
+^C
+--- server-link0 ping statistics ---
+5 packets transmitted 5 received 0%% packet loss time 4095ms
+rtt min/avg/max/mdev = 0.025/0.033/0.057/0.012 ms
+
+INPUT|sunshine-example-7|A1 A2 |1576626536|sunshine|server:apt-get install iperf|E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)
+E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend) are you root?
+
+INPUT|sunshine-example-8|M1 |1576626539|sunshine|server:apt-get install iperf|Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+The following package was automatically installed and is no longer required:
+  python3-netifaces
+Use 'sudo apt autoremove' to remove it.
+The following NEW packages will be installed:
+  iperf
+0 upgraded 1 newly installed 0 to remove and 306 not upgraded.
+Need to get 60.5 kB of archives.
+After this operation 176 kB of additional disk space will be used.
+Get:1 http://scratch/ubuntu bionic-updates/universe amd64 iperf amd64 2.0.10+dfsg1-1ubuntu0.18.04.2 [60.5 kB]
+Fetched 60.5 kB in 0s (1707 kB/s)
+Selecting previously unselected package iperf.
+(Reading database ... 154834 files and directories currently installed.)
+Preparing to unpack .../iperf_2.0.10+dfsg1-1ubuntu0.18.04.2_amd64.deb ...
+Unpacking iperf (2.0.10+dfsg1-1ubuntu0.18.04.2) ...
+Setting up iperf (2.0.10+dfsg1-1ubuntu0.18.04.2) ...
+Processing triggers for man-db (2.8.3-2ubuntu0.1) ...
+
+INPUT|sunshine-example-9|M3 |1576626578|sunshine|server:iperf -s|------------------------------------------------------------
+Server listening on TCP port 5001
+TCP window size: 85.3 KByte (default)
+------------------------------------------------------------
+[  4] local 10.1.1.3 port 5001 connected with 10.1.1.2 port 38134
+[ ID] Interval       Transfer     Bandwidth
+[  4]  0.0- 7.8 sec  87.8 MBytes  94.2 Mbits/sec
+^C
+
+INPUT|sunshine-example-10|A4 A3 A1 A2 |1576626591|sunshine|client:nstall iperf|E: Could not open lock file /var/lib/dpkg/lock-frontend - open (13: Permission denied)
+E: Unable to acquire the dpkg frontend lock (/var/lib/dpkg/lock-frontend) are you root?
+
+INPUT|sunshine-example-11|M2 |1576626593|sunshine|client:apt-get install iperf|Reading package lists... Done
+Building dependency tree       
+Reading state information... Done
+The following package was automatically installed and is no longer required:
+  python3-netifaces
+Use 'sudo apt autoremove' to remove it.
+The following NEW packages will be installed:
+  iperf
+0 upgraded 1 newly installed 0 to remove and 306 not upgraded.
+Need to get 60.5 kB of archives.
+After this operation 176 kB of additional disk space will be used.
+Get:1 http://scratch/ubuntu bionic-updates/universe amd64 iperf amd64 2.0.10+dfsg1-1ubuntu0.18.04.2 [60.5 kB]
+Fetched 60.5 kB in 0s (4312 kB/s)
+Selecting previously unselected package iperf.
+(Reading database ... 154834 files and directories currently installed.)
+Preparing to unpack .../iperf_2.0.10+dfsg1-1ubuntu0.18.04.2_amd64.deb ...
+Unpacking iperf (2.0.10+dfsg1-1ubuntu0.18.04.2) ...
+Setting up iperf (2.0.10+dfsg1-1ubuntu0.18.04.2) ...
+Processing triggers for man-db (2.8.3-2ubuntu0.1) ...
+
+INPUT|sunshine-example-12|M4 |1576626609|sunshine|client:iperf -c server|------------------------------------------------------------
+Client connecting to server TCP port 5001
+TCP window size: 85.0 KByte (default)
+------------------------------------------------------------;1576626609
+[  3] local 10.1.1.2 port 38134 connected with 10.1.1.3 port 5001
+^C[ ID] Interval       Transfer     Bandwidth
+[  3]  0.0- 7.8 sec  87.8 MBytes  94.9 Mbits/sec
+
+INPUT|sunshine-example-13|U |1576626627|sunshine|client:exit|exit
+
+INPUT|sunshine-example-14|U |1576626628|sunshine|server:exit|exit
+

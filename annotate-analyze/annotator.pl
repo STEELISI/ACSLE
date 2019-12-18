@@ -79,7 +79,7 @@ sub processline
     {
 	$uc{$uid} = 1;
     }
-    $i = $uc{$uid};
+    $i = $time; #uc{$uid};
     $users{$uid}{$i}{'time'} = $time;
     $users{$uid}{$i}{'node'} = $node;
     $users{$uid}{$i}{'input'} = $input;
@@ -94,7 +94,7 @@ if ($#ARGV < 2)
     exit(0);
 }
 opendir(my $dh, $ARGV[0]) || die "Can't open $ARGV[0] $!";
-@files = sort (readdir $dh);
+@files = grep { /csv$/ } sort (readdir $dh);
 
 # Load user files
 # do this in two passes since
@@ -175,7 +175,7 @@ for $uid (keys %users)
     %isroot = ();
     $mintime = 0;
     $maxtime = 0;
-    for $i (sort keys %{$users{$uid}})
+    for $i (sort {$a <=> $b} keys %{$users{$uid}})
     {
 	# Remember minimum and maximum time 
 	if ($users{$uid}{$i}{'time'} != 0)
@@ -245,7 +245,8 @@ for $uid (keys %users)
 			    {
 				print "$uid: Trying to match milestone $j option $m pattern *$e* with $users{$uid}{$i}{$dir} dir $dir\n";
 			    }
-			    if ($users{$uid}{$i}{$dir} =~ /$e/)
+			    $found = 0;
+			    if ($users{$uid}{$i}{$dir} =~ /$e/s) 
 			    {
 				$match++;
 				$matched += length $e;

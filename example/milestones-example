@@ -1,0 +1,5 @@
+client,ping -f server,ping statistics
+server,install iperf,Reading
+client,install iperf,Reading
+server,iperf -s,*
+client,iperf -c server,*
