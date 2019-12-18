@@ -1,3 +1,3 @@
-This folder has the example input for a two-node experiment in the input folder. The folder contains csv files as they were collected with our monitor component.
+This folder has the example input for a two-node experiment in the "input" folder. The folder contains csv files as they were collected with our monitor component.
 
-The sample list of milestones is in the milestones-example. We want the student to create ping flood from the client to the server, then to install iperf on both nodes and to run iperf from client to test the bandwidth to the server. The user, after some blundering, succeeds in all the tasks. The folder output contains the annotated output.
+The sample list of milestones is in the milestones-example. We want the student to create ping flood from the client to the server, then to install iperf on both nodes and to run iperf from client to test the bandwidth to the server. The user, after some blundering, succeeds in all the tasks. The folder "out" contains the annotated output.
