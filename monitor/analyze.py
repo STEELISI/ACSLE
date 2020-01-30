@@ -47,8 +47,10 @@ def starting_index_timestamp(line):
 
 def get_ttylog_lines_from_file(ttylog):
     """Read from ttylog. If lines have '\r' at end, remove that '\r'. Return the read lines"""
-    ttylog_file = open(ttylog,'r',errors='ignore', newline='\n')
+    ttylog_file = open(ttylog,'r',errors='ignore', newline='\n',encoding='utf-8')
     ttylog_read_data = ttylog_file.read()
+    #Replace escaped double qoutes with qoutes
+    ttylog_read_data = ttylog_read_data.replace(r'\"','"')
     ttylog_file.close()
     ttylog_lines = ttylog_read_data.split('\n')
     ttylog_lines_file = []
@@ -75,9 +77,9 @@ def decode(lines):
     'csi_dec_private_mode_reset' : re.compile(r'^\?(?:[0-9]*;?)*l'),
     'csi_character_attributes' : re.compile(r'^(?:[0-9]*;?)*m'),
     'csi_window_manipulation' : re.compile(r'^[0-9]*(?:;[0-9]*){2}t'),
+    'csi_delete_n_chars' : re.compile(r'^\d*P'),
     'controls_c1_esc_single_char' : re.compile(r'^[6789=>Fclmno|}~]')
     }
-    
     buf = []
     i_line = 0
     decode_line_timestamp = ''
@@ -120,7 +122,6 @@ def decode(lines):
         len_line = len(line)
 
         while i_stream_line < len_line:
-            
             #Skip the bell (^G) characters
             if line[i_stream_line] == '\x07':
                 i_stream_line += 1
@@ -169,12 +170,6 @@ def decode(lines):
                     cursor_pointer += n
                     i_stream_line += 2 if line[i_stream_line] in string.digits else 1
 
-                elif (line[i_stream_line] == 'P') or (line[i_stream_line] in string.digits and line[i_stream_line + 1] == 'P'):
-                    """ delete n chars  """
-                    n = int(line[i_stream_line]) if line[i_stream_line] in string.digits else 1
-                    buf[i_line] = buf[i_line][:cursor_pointer] + buf[i_line][cursor_pointer + n:]
-                    i_stream_line += 2 if line[i_stream_line] in string.digits else 1
-
                 #If sequence is <0x1b>[J, <0x1b>[2J, <0x1b>[3J,  or <0x1b>[3;J, erase in display. Erasing from the start of the line, to the current cursor position
                 elif line[i_stream_line] == 'J' or (line[i_stream_line] in string.digits and ( (line[i_stream_line + 1] == ';' and line[i_stream_line + 2] == 'J') or (line[i_stream_line + 1] == 'J') )):
                     cursor_pointer = 0
@@ -186,6 +181,20 @@ def decode(lines):
                             i_stream_line += 3
                         elif line[i_stream_line + 1] == 'J':
                             i_stream_line += 2
+
+                #Delete n characters. Sample is <0x1b>[17P (Delete 17 characters)
+                elif escape_sequence_dict['csi_delete_n_chars'].match(line[i_stream_line:]):
+                    move_cursor_control_characters = escape_sequence_dict['csi_delete_n_chars'].match(line[i_stream_line:]).span()[1]
+                    n = -1
+                    #If the pattern is <0x1b>[23P
+                    if move_cursor_control_characters > 1:
+                        n = int(line[i_stream_line: (i_stream_line + move_cursor_control_characters - 1) ] )
+                    #If the pattern is <0x1b>[P
+                    elif move_cursor_control_characters == 1:
+                        n = 1
+                    if n >=1 :
+                        buf[i_line] = buf[i_line][:cursor_pointer] + buf[i_line][cursor_pointer + n:]
+                        i_stream_line += move_cursor_control_characters
 
                 #If sequence is <0x1b>[n;mH, escape it. This is for moving the cursor. <0x1b>[H movies the cursor to first row and column
                 elif escape_sequence_dict['csi_cursor_position'].match(line[i_stream_line:]):
@@ -347,6 +356,12 @@ if __name__ == "__main__":
                 line = line[start_of_prompt:]
             
             if line_timestamp > 0 and len(line_command) > 0:
+                # Truncate output of comand to first 500 characters
+                output_prevous_command = output_prevous_command[:500]
+                # Add a newline character to previously truncated output
+                if (len(output_prevous_command) > 0) and (output_prevous_command[-1] != "\n"):
+                    output_prevous_command += "\n"
+
                 #If earlier the prompt was root, and now the prompt is of normal user, append using root_prompt for this line. Afterwards, set 'is_current_prompt_root' to False, and append using 'user_prompt'
                 if is_current_prompt_root == True:
                     ttylog_sessions[current_session_id]['lines'].append(['CMBEGIN', node_name, line_timestamp, current_working_directory, line_command, output_prevous_command, root_prompt])
@@ -393,6 +408,12 @@ if __name__ == "__main__":
             # line = line[start_of_last_prompt:]
 
             if line_timestamp > 0 and len(line_command) > 0:
+                # Truncate output of comand to first 500 characters
+                output_prevous_command = output_prevous_command[:500]
+                # Add a newline character to previously truncated output
+                if (len(output_prevous_command) > 0) and (output_prevous_command[-1] != "\n"):
+                    output_prevous_command += "\n"
+
                 #If this is the first line when the user became root, we want the prompt to be 'user_prompt', not 'root_prompt'
                 if is_current_prompt_root == False:
                     user_prompt = ttylog_sessions[current_session_id]['initial_prompt']
@@ -431,6 +452,12 @@ if __name__ == "__main__":
         #Get the session exit line
         elif r'END tty_sid' in line:
             if line_timestamp > 0 and len(line_command) > 0:
+                # Truncate output of comand to first 500 characters
+                output_prevous_command = output_prevous_command[:500]
+                # Add a newline character to previously truncated output
+                if (len(output_prevous_command) > 0) and (output_prevous_command[-1] != "\n"):
+                    output_prevous_command += "\n"
+                    
                 if is_current_prompt_root == True:
                     ttylog_sessions[current_session_id]['lines'].append(['CMBEGIN', node_name, line_timestamp, current_working_directory, line_command, output_prevous_command, root_prompt])
                     is_current_prompt_root = False
@@ -457,7 +484,7 @@ if __name__ == "__main__":
     sorted_ttylog_lines.sort(key = sort_ttylog_lines)
 
     #Writing data to CSV
-    csvfile = open(csv_output_file,'w', newline='')
+    csvfile = open(csv_output_file,'w', newline='',encoding='utf-8')
     csvwriter = csv.writer(csvfile, delimiter=',', quotechar='%', quoting=csv.QUOTE_MINIMAL)
 
     for line in sorted_ttylog_lines:
