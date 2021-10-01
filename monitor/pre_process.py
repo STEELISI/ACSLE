@@ -48,6 +48,7 @@ nickname = nickname.splitlines()[0]
 host, exp, proj = nickname.split('.')
 
 ttylog_files_path = r'/var/log/ttylog/'
+acont_files_path = r'/var/log/analyze_cont/'
 if not os.path.exists(ttylog_files_path):
     os.system(r'mkdir {}'.format(ttylog_files_path))
 
@@ -83,8 +84,9 @@ while True:
             dest_log_name = r"{}.{}.{}.log".format(user_name_file, exp, host)
             dest_output_name = r"{}.{}.{}.csv".format(user_name_file, exp, host)
             os.system(r"cat {}ttylog.{}.* > {}{}".format(ttylog_files_path, user_name_file, ttylog_files_path, dest_log_name) )
-            os.system(r"python3 /usr/local/src/analyze.py {}{} {}{}".format(ttylog_files_path, dest_log_name, ttylog_files_path, dest_output_name))
-            os.system(r"cp {}{} {}{}".format(ttylog_files_path, dest_log_name, logs_path, dest_log_name) )
+            os.system(r"cat {}analyze.{}.* > {}{}".format(acont_files_path, user_name_file, ttylog_files_path, dest_output_name) )
+            #os.system(r"python3 /usr/local/src/analyze.py {}{} {}{}".format(ttylog_files_path, dest_log_name, ttylog_files_path, dest_output_name))
+            # os.system(r"cp {}{} {}{}".format(ttylog_files_path, dest_log_name, logs_path, dest_log_name) )
             os.system(r"cp {}{} {}{}".format(ttylog_files_path, dest_output_name, output_csv_path, dest_output_name) )
 
-    time.sleep(60)
+    time.sleep(1)

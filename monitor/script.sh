@@ -18,4 +18,6 @@
 #
 
 #This program starts the script for launching the ttylog logger
-bash /usr/local/src/start_ttylog.sh
+#For sending SIGHUP upon exit, we need to set the shell to interacive (-i), login (-l)
+#huponexit option needs to be set to send SIGHUP to background process on exit
+bash -l -O huponexit /usr/local/src/start_ttylog.sh
