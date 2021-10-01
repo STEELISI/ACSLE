@@ -19,7 +19,7 @@
 # This file is specific to Deterlab. It pulls logs from the experiment folders
 # into one destination folder, and merges them per user
 
-# Arguments are project from which logs are pulled
+# Arguments are project from which logs are pulled,
 # and destination folder where they should be saved
 
 $usage="$0 project dst_folder";
@@ -39,40 +39,65 @@ for $f (@files)
     {
 	next;
     }
-    print "File $f\n";
     if ($f =~ /\.csv/)
     {
+	print "File $f\n";
 	@items = split(/\./, $f);
 	$key = $items[0] . "." . $items[1];
+	# print "key: $key\n";
+	$count = 0;
+	$row_id = "";
 	$contents = "";
 	$curtime = 0;
 	my $fh = new IO::File("/proj/$proj/logs/output_csv/$f");
 	while(<$fh>)
 	{
-	    if ($_ =~ /^CMBEGIN/)
-	    {
-		if ($curtime > 0)
+		if ($count == 0)
 		{
-		    $records{$key}{$curtime} = $contents;
-		    $contents = "";
+			@elems = split(/\,/, $_);
+
+		# ==== @ids = (exp_name, start_time, counter) ====
+
+			@ids = split(/\:/, $elems[0]);
+
+		# === $row_id = exp_name:start_time ===
+
+			$row_id = $ids[0] . ":" . $ids[1];
+			# print "row_id: $row_id\n";
+			$curtime = $elems[2];
+			$count += 1;
+			$contents .= $_;
+			next;
 		}
-		@elems = split(/\,/, $_);
-		$curtime = $elems[2];
-	    }
-	    $contents .= $_;
+		if ($_ =~ /^$row_id/)
+		{
+			if ($curtime > 0)
+			{
+				$records{$key}{$curtime} = $contents;
+				#print "count: $count\n";
+				#print "curtime: $curtime\n";
+				#print "contents: $contents\n";
+				$contents = "";
+			}
+			@elems = split(/\,/, $_);
+			$curtime = $elems[2];
+			$count += 1;
+		}
+		$contents .= $_;
 	}
 	if ($curtime > 0)
 	{
-	    $records{$key}{$curtime} = $contents;
+		$records{$key}{$curtime} = $contents;
 	}
     }
 }
+
 for $key (sort keys %records)
 {
     open(my $oh, '>>', $dst . '/' . $key  . '.log');
     for $c (sort {$a <=> $b} keys %{$records{$key}})
     {
-	print $oh $records{$key}{$c};
+		print $oh $records{$key}{$c};
     }
     close($oh);
 }

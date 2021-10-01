@@ -48,6 +48,7 @@ if ($#ARGV < 1)
     print $usage;
     exit(0);
 }
+
 %ncs = ();
 %cmds = ();
 %addedcmds = ();
@@ -64,24 +65,25 @@ while(<$fh>)
     @elems = split /\|/, $items[1];
     for $e (@elems)
     {
-	$e =~ s/sudo //;
-	@words  = split /\s+/, $e;
-	$addedcmds{$words[0]} = 1;
+		$e =~ s/sudo //;
+		@words  = split /\s+/, $e;
+		$addedcmds{$words[0]} = 1;
     }
 }
 close($fh);
+
 $fh = new IO::File($ARGV[0]);
 while(<$fh>)
 {
-    $line = $_;
+	$line = $_;
     $i = index $_, '>';
-    if ($i > -1)
+	if ($i > -1)
     {
-	$line = substr $line, 0, $i-1;
+		$line = substr $line, 0, $i-1;
     }
-    @items = split /\s+/, $line;
+	@items = split /\s+/, $line;
 
-    $cmd = $items[1];
+	$cmd = $items[1];
     @elems = split(/\:/, $cmd);
     $maincmd = $elems[1];
     $node = $elems[0];
@@ -89,63 +91,67 @@ while(<$fh>)
     # is it misspelled?
     $found = 0;
 
-    if (exists($addedcmds{$maincmd}))
+	if (exists($addedcmds{$maincmd}))
     {
-	$found = 1;
+		$found = 1;
     }
-    else
+	else
     {
-	open(WHICH, "which $maincmd|" );
-	while(<WHICH>)
-	{
-	    $found = 1;
+		open(WHICH, "which $maincmd|" );
+		while(<WHICH>)
+		{
+			$found = 1;
+		}
 	}
-    }
-    if (!$found && $maincmd ne "cd")
+	if (!$found && $maincmd ne "cd")
     {
-	$cmd = "$node:misspelled";
-	$maincmd = "misspelled";
+		$cmd = "$node:misspelled";
+		$maincmd = "misspelled";
     }
-    
-    $ncs{$cmd} += $items[0];
+	
+	$ncs{$cmd} += $items[0];
     $all += $items[0];
-    if ($maincmd eq "misspelled")
+	if ($maincmd eq "misspelled")
     {
-	next;
+		next;
     }
 
-    $options = "";
+	$options = "";
     $cmduse{$maincmd}{'cnt'} += $items[0];
-    for ($i = 2; $i <= $#items; $i++)
+	for ($i = 2; $i <= $#items; $i++)
     {
-	if ($items[$i] =~ /^\-/)
-	{
-	    if (index($options, $items[$i]) == -1)
-	    {
-		if ($options ne "")
+		if ($items[$i] =~ /^\-/)
 		{
-		    $options .= " ";
+			if (index($options, $items[$i]) == -1)
+			{
+				if ($options ne "")
+				{
+					$options .= " ";
+				}
+				$options .= $items[$i];
+			}
+			$cmds{$cmd}{$items[$i]}{'cnt'} += $items[0];
+			$cmduse{$maincmd}{$items[$i]}{'cnt'} += $items[0];
+			$cmduse{$maincmd}{'cnt'} += $items[0];
+			if ($i <= $#items - 1 && $items[$i+1] !~ /^\-/)
+			{
+				$cmds{$cmd}{$items[$i]}{$items[$i+1]} += $items[0];
+				$cmduse{$maincmd}{$items[$i]}{$items[$i+1]} += $items[0];
+				$i++;
+			}
 		}
-		$options .= $items[$i];
-	    }
-	    $cmds{$cmd}{$items[$i]}{'cnt'} += $items[0];
-	    $cmduse{$maincmd}{$items[$i]}{'cnt'} += $items[0];
-	    $cmduse{$maincmd}{'cnt'} += $items[0];
-	    if ($i <= $#items - 1 && $items[$i+1] !~ /^\-/)
-	    {
-		$cmds{$cmd}{$items[$i]}{$items[$i+1]} += $items[0];
-		$cmduse{$maincmd}{$items[$i]}{$items[$i+1]} += $items[0];
-		$i++;
-	    }
-	}
-	else
-	{
-	    $cmds{$cmd}{'args'}{$items[$i]} += $items[0];
-	    $cmduse{$maincmd}{$items[$i]}{'cnt'} += $items[0];
-	}
+		else
+		{
+			$cmds{$cmd}{'args'}{$items[$i]} += $items[0];
+			$cmduse{$maincmd}{$items[$i]}{'cnt'} += $items[0];
+		}
     }
-    $cmds{$cmd}{'params'}{$options} += $items[0];
+	$cmds{$cmd}{'params'}{$options} += $items[0];
 }
+
+
+print "all $all\n";
+
 
 open(my $oh, '>', 'cmds.gv') or die "Could not open file cmds.gv  $!";
 open(my $ih, '>', 'optargs.gv') or die "Could not open file optargs.gv  $!";
@@ -171,20 +177,20 @@ for $c (sort {$ncs{$b} <=> $ncs{$a}} keys %ncs)
 {
     if ($ncs{$c} < 0.01*$all)
     {
-	last;
+		last;
     }
     @elems = split(/\:/, $c);
     $node = $elems[0];
     $maincmd = $elems[1];
     if (!exists($nodes{$node}))
     {
-	$cntc++;
-	$nodes{$node} = 0;
-	$freq=int(100*$nodecmds{$node}/$all)/100;
-	$w = $nodecmds{$node}/$all;
-	print $oh "node [style=filled, color=\"" . $colors[$cntc%5] . "\"];\n";
-	$nodecolors{$node} = $colors[$cntc%5];
-	print $oh "all->\"" . $node . "\" [style=\"setlinewidth($w)\", label=$freq]\n";
+		$cntc++;
+		$nodes{$node} = 0;
+		$freq=int(100*$nodecmds{$node}/$all)/100;
+		$w = $nodecmds{$node}/$all;
+		print $oh "node [style=filled, color=\"" . $colors[$cntc%5] . "\"];\n";
+		$nodecolors{$node} = $colors[$cntc%5];
+		print $oh "all->\"" . $node . "\" [style=\"setlinewidth($w)\", label=$freq]\n";
     }
     $w = $ncs{$c}/$all;
     $freq = int(100*$ncs{$c}/$nodecmds{$node})/100;
@@ -194,44 +200,44 @@ for $c (sort {$ncs{$b} <=> $ncs{$a}} keys %ncs)
     $printedcmds{$maincmd} = 1;
     if ($c !~ /misspelled/)
     {
-	$sumo = 0;
-	for $o (sort{$cmds{$c}{'params'}{$b} <=> $cmds{$c}{'params'}{$a}} keys %{$cmds{$c}{'params'}})
-	{
-	    if ($cmds{$c}{'params'}{$o} < $SMALL*$ncs{$c})
-	    {
-		last;
-	    }
-	}
-	for $i (sort {$cmds{$c}{$b}{'cnt'} <=> $cmds{$c}{$a}{'cnt'}} keys %{$cmds{$c}})
-	{
-	    if ($i eq "params")
-	    {
-		next;
-	    }
-	    if ($cmds{$c}{$i}{'cnt'} <= $SMALL*$ncs{$c})
-	    {
-		next;
-	    }
-	    for $ar (sort {$cmds{$c}{$i}{$b} <=> $cmds{$c}{$i}{$a}} keys %{$cmds{$c}{$i}})
-	    {
-		if ($ar eq 'cnt')
+		$sumo = 0;
+		for $o (sort{$cmds{$c}{'params'}{$b} <=> $cmds{$c}{'params'}{$a}} keys %{$cmds{$c}{'params'}})
 		{
-		    next;
+			if ($cmds{$c}{'params'}{$o} < $SMALL*$ncs{$c})
+			{
+				last;
+			}
 		}
-		if ($cmds{$c}{$i}{$ar} < $SMALL*$cmds{$c}{$i}{'cnt'})
+		for $i (sort {$cmds{$c}{$b}{'cnt'} <=> $cmds{$c}{$a}{'cnt'}} keys %{$cmds{$c}})
 		{
-		    next;
+			if ($i eq "params")
+			{
+				next;
+			}
+			if ($cmds{$c}{$i}{'cnt'} <= $SMALL*$ncs{$c})
+			{
+				next;
+			}
+			for $ar (sort {$cmds{$c}{$i}{$b} <=> $cmds{$c}{$i}{$a}} keys %{$cmds{$c}{$i}})
+			{
+				if ($ar eq 'cnt')
+				{
+					next;
+				}
+				if ($cmds{$c}{$i}{$ar} < $SMALL*$cmds{$c}{$i}{'cnt'})
+				{
+					next;
+				}
+				print $cmds{$c}{$i}{$ar} . "\t$ar\n";
+			}
 		}
-		print $cmds{$c}{$i}{$ar} . "\t$ar\n";
-	    }
-	}
-	for $ar (sort {$cmds{$c}{'args'}{$b} <=> $cmds{$c}{'args'}{$a}} keys %{$cmds{$c}{'args'}})
-	{
-	    if ($cmds{$c}{'args'}{$ar} <= $SMALL*$ncs{$c})
-	    {
-		next;
-	    }
-	}
+		for $ar (sort {$cmds{$c}{'args'}{$b} <=> $cmds{$c}{'args'}{$a}} keys %{$cmds{$c}{'args'}})
+		{
+			if ($cmds{$c}{'args'}{$ar} <= $SMALL*$ncs{$c})
+			{
+				next;
+			}
+		}
     }    
 }
 # Print out commands and their args
@@ -242,52 +248,52 @@ for $c (keys %cmduse)
 {
     if (!exists($printedcmds{$c}))
     {
-	next;
+		next;
     }
     $middle{$cntc} = $c;
 
     @printi=();
     for $i (sort {$cmduse{$c}{$b}{'cnt'} <=> $cmduse{$c}{$a}{'cnt'}} keys %{$cmduse{$c}})
     {
-	if ($i eq 'cnt')
-	{
-	    next;
-	}
+		if ($i eq 'cnt')
+		{
+			next;
+		}
 
-	$w = $cmduse{$c}{$i}{'cnt'}/$cmduse{$c}{'cnt'};
-	if ($cmduse{$c}{$i}{'cnt'} < $SMALL * $cmduse{$c}{'cnt'})
-	{
-	    next;
-	}
-	push(@printi,  escape($c . ":" . $i));
-	$frac = int($cmduse{$c}{$i}{'cnt'}/$cmduse{$c}{'cnt'}*100)/100;
-	print $ih "node [style=filled, color=\"" . $colors[$cntc%5] . "\"];\n";
-	print $ih "\"" . escape($c . ":" . $i) . "\" [label=\"" . escape($i) . "\"]\n";
-	print $ih "\"$c\"->\"" . escape($c . ":" . $i) . "\" [style=\"setlinewidth($w)\", label=$frac]\n";
-	for $ar (sort {$cmduse{$c}{$i}{$b} <=> $cmduse{$c}{$i}{$a}} keys %{$cmduse{$c}{$i}})
-	{
-	    if ($ar eq 'cnt')
-	    {
-		next;
-	    }
-	    if ($cmduse{$c}{$i}{$ar} < $SMALL * $cmduse{$c}{$i}{'cnt'})
-	    {
-		next;
-	    }
-	    $frac = int($cmduse{$c}{$i}{$ar}/$cmduse{$c}{$i}{'cnt'}*100)/100;
-	    $w = $cmduse{$c}{$i}{$ar}/$cmduse{$c}{'cnt'};
-	    print $ih "\"" . escape($c . ":" . $i . ":" . $ar) . "\" [label=\"" . escape($ar) . "\"]\n";
-	    print $ih "\"" . escape($c . ":" . $i) . "\"->\"" . escape($c . ":" . $i . ":" . $ar) . "\" [style=\"setlinewidth($w)\", label=$frac]\n";
-	}
+		$w = $cmduse{$c}{$i}{'cnt'}/$cmduse{$c}{'cnt'};
+		if ($cmduse{$c}{$i}{'cnt'} < $SMALL * $cmduse{$c}{'cnt'})
+		{
+			next;
+		}
+		push(@printi,  escape($c . ":" . $i));
+		$frac = int($cmduse{$c}{$i}{'cnt'}/$cmduse{$c}{'cnt'}*100)/100;
+		print $ih "node [style=filled, color=\"" . $colors[$cntc%5] . "\"];\n";
+		print $ih "\"" . escape($c . ":" . $i) . "\" [label=\"" . escape($i) . "\"]\n";
+		print $ih "\"$c\"->\"" . escape($c . ":" . $i) . "\" [style=\"setlinewidth($w)\", label=$frac]\n";
+		for $ar (sort {$cmduse{$c}{$i}{$b} <=> $cmduse{$c}{$i}{$a}} keys %{$cmduse{$c}{$i}})
+		{
+			if ($ar eq 'cnt')
+			{
+				next;
+			}
+			if ($cmduse{$c}{$i}{$ar} < $SMALL * $cmduse{$c}{$i}{'cnt'})
+			{
+				next;
+			}
+			$frac = int($cmduse{$c}{$i}{$ar}/$cmduse{$c}{$i}{'cnt'}*100)/100;
+			$w = $cmduse{$c}{$i}{$ar}/$cmduse{$c}{'cnt'};
+			print $ih "\"" . escape($c . ":" . $i . ":" . $ar) . "\" [label=\"" . escape($ar) . "\"]\n";
+			print $ih "\"" . escape($c . ":" . $i) . "\"->\"" . escape($c . ":" . $i . ":" . $ar) . "\" [style=\"setlinewidth($w)\", label=$frac]\n";
+		}
     }
     if (scalar(@printi) > 0)
     {
-	$middle{$cntc} = $printi[int(scalar(@printi)/2)];
+		$middle{$cntc} = $printi[int(scalar(@printi)/2)];
     }
 
     if ($cntc > 2)
     {
-	print $ih "\"" . $middle{$cntc-3} . "\"->\"$c\" [color=\"white\"]\n";
+		print $ih "\"" . $middle{$cntc-3} . "\"->\"$c\" [color=\"white\"]\n";
     }
     $cntc ++;
 }

@@ -26,59 +26,60 @@ if ($#ARGV < 0)
     print $usage;
     exit(0);
 }
+
 %umet=();
 %uattempted=();
-%users = ();
 opendir(my $dh, $ARGV[0]) || die "Can't open $ARGV[0] $!";
 @files = readdir $dh;
 for $f (@files)
 {
-    if ($f =~ /^\./)
+	if ($f =~ /^\./)
     {
-	next;
+		next;
     }
-    $lines = 0;
+	$lines = 0;
     $attempts = 0;
     $miles = 0;
-    $fh = new IO::File($ARGV[0] . "/" . $f);
-    $line = <$fh>;
-    #User username start time 1548706268 end 1549309035
-    @items = split /\s+/, $line;
-    $uid = $items[1];
+	$fh = new IO::File($ARGV[0] . "/" . $f);
+	$line = <$fh>;
+	#User username start time 1548706268 end 1549309035
+	@items = split /\s+/, $line;
+	$uid = $items[1];
+	# print "uid: $uid\n";
     $dur = $items[6] - $items[4];
-    <$fh>;
-    while(<$fh>)
-    {
-	if ($_ !~ /^INPUT/)
+	# print "dur: $dur\n";
+	<$fh>;
+	while(<$fh>)
 	{
-	    next;
+		if ($_ !~ /^INPUT/)
+		{
+			next;
+		}
+		$isattempt = 0;
+		@items = split /\|/, $_;
+		@elems = split /\s+/, $items[2];
+		for $e (@elems)
+		{
+			if ($e =~ /(^M)(\d+)/)
+			{
+				$m = $2;
+				$umet{$uid}{$m} = 1;
+				$miles ++;
+			}
+			elsif ($e =~ /(^A)(\d+)/)
+			{
+				$a = $2;
+				$uattempted{$uid}{$m} = 1;
+				$isattempt = 1;
+			}
+		}
+		if ($isattempt)
+		{
+			$attempts++;
+		}
+		$lines++;
 	}
-	$isattempt = 0;
-	@items = split /\|/, $_;
-	@elems = split /\s+/, $items[2];
-	for $e (@elems)
-	{
-	    if ($e =~ /(^M)(\d+)/)
-	    {
-		$m = $2;
-		$umet{$uid}{$m} = 1;
-		$miles ++;
-	    }
-	    elsif ($e =~ /(^A)(\d+)/)
-	    {
-		$m = $2;
-		$uattempted{$uid}{$m} = 1;
-		$isattempt = 1;
-	    }
-	}
-	if ($isattempt)
-	{
-	    $attempts++;
-	}
-	$lines++;
-    }
-    $dur = $dur/3600;
+	$dur = $dur/3600;
     $dur = int($dur*100)/100;
     print "User $uid worked for $dur hours and $lines lines, met " . scalar(keys %{$umet{$uid}}) . " milestones, and attempted " . scalar(keys %{$uattempted{$uid}}) . " total milestone hits $miles and failed attempts $attempts\n";
 }
-
