@@ -1,4 +1,4 @@
-# ACSLE
+# ACSLE Software Repository
 
 This is the code accompanying our SIGCSE 2020 paper "Using Terminal Histories to Monitor Student Progress on Hands-on Exercises". 
 
