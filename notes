@@ -1,3 +1,4 @@
+needed to install strace
 look into prompt.sh to fix prompt
 next fix analyze_cont
 next make triggering script on SSH login
