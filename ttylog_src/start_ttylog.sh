@@ -50,7 +50,11 @@ fi
 function clean_up {
         echo
         $sudo bash -c "echo 'END tty_sid:$CNT' >> $LOGPATH"
-        PSTRING_KILL=$(ps -o args -p ${PID_CONTCSV} --no-headers 2>/dev/null)
+        for i in $(seq 1 50); do
+            PSTRING_KILL=$(ps -o args -p ${PID_CONTCSV} --no-headers 2>/dev/null)
+            [[ $PSTRING_KILL =~ ${CONTCSVPATH} ]] || break
+            sleep 0.1
+        done
         if [[ $PSTRING_KILL =~ ${CONTCSVPATH} ]]; then
             $sudo kill ${PID_CONTCSV} 2>/dev/null
         fi
@@ -76,18 +80,17 @@ function start_up {
     $sudo mkdir -p /var/log/ttylog/
     #Checking for the existence for a log file constructed using hostname, project name, and experiment name
     #A log file constructed using just the hostname will also work fine.
-    if $sudo [ -e "/tmp/count.$USER" ]; then
-        CNT=$($sudo cat /tmp/count.$USER)
+    COUNTFILE=/var/log/ttylog/count.$USER
+    if $sudo [ -e "$COUNTFILE" ]; then
+        CNT=$($sudo cat $COUNTFILE)
         let CNT++
-        echo $CNT | $sudo tee /tmp/count.$USER > /dev/null
-    #Created a log file consisting of hostname, project name, and experiment name
-    #A log file constructed using just the hostname will also work fine.
     else
-        $sudo touch /tmp/count.$USER
-        $sudo chmod ugo+rw /tmp/count.$USER
-        echo "0" > /tmp/count.$USER
         CNT=0
     fi
+    while $sudo [ -e "/var/log/ttylog/ttylog.$HN.$USER.$CNT.trace" ]; do
+        let CNT++
+    done
+    echo $CNT | $sudo tee $COUNTFILE > /dev/null
 
     export TTY_SID=$CNT
     export TTY_USER=$USER
@@ -95,10 +98,13 @@ function start_up {
 
     $sudo touch $LOGPATH
     $sudo chmod ugo+rw $LOGPATH
+    ERRPATH=/var/log/ttylog/ttylog.$HN.$USER.$CNT.err
+    $sudo touch $ERRPATH
+    $sudo chmod ugo+rw $ERRPATH
 
     
     echo "starting session w tty_sid:$CNT" >> $LOGPATH
-    echo "User prompt is ${PS1@P}" >> $LOGPATH
+    echo "User prompt is ${USER}@${HN%%.*}" >> $LOGPATH
     echo "Home directory is ${HOME}" >> $LOGPATH
 
    }
@@ -111,7 +117,7 @@ if [ -z "$SSH_ORIGINAL_COMMAND" ]; then
 
     start_up
 
-    $sudo /usr/local/src/ttylog/ttylog $TTY >> $LOGPATH 2>/dev/null &
+    setsid $sudo /usr/local/src/ttylog/ttylog $TTY >> $LOGPATH 2>> $ERRPATH < /dev/null &
 
 
     # Annotator requires existence of a CSV file produced by analyze_continuous.py
@@ -122,7 +128,7 @@ if [ -z "$SSH_ORIGINAL_COMMAND" ]; then
         $sudo mkdir -p $CONTCSVDIR
     fi
     CONTCSVPATH=${CONTCSVDIR}analyze.$USER.$CNT.csv
-    $sudo python3 /usr/local/src/analyze_continuous.py ${LOGPATH} ${CONTCSVPATH} 2>/dev/null &
+    setsid $sudo python3 /usr/local/src/analyze_continuous.py ${LOGPATH} ${CONTCSVPATH} 2>/dev/null < /dev/null &
     PID_CONTCSV=$!
 
     # Create an empty CSV file if no such file exists.

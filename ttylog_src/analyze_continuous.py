@@ -51,6 +51,29 @@ def starting_index_timestamp(line):
     else:
         return None
 
+in_alternate_screen = False
+
+def remove_alternate_screen(data):
+    """Remove text drawn by full-screen programs (nano, vim, less) while they use the alternate screen"""
+    global in_alternate_screen
+    kept = []
+    while data:
+        if in_alternate_screen:
+            end = data.find('\x1b[?1049l')
+            if end == -1:
+                break
+            data = data[end + len('\x1b[?1049l'):]
+            in_alternate_screen = False
+        else:
+            start = data.find('\x1b[?1049h')
+            if start == -1:
+                kept.append(data)
+                break
+            kept.append(data[:start])
+            data = data[start + len('\x1b[?1049h'):]
+            in_alternate_screen = True
+    return ''.join(kept)
+
 def get_ttylog_lines_from_file(ttylog, ttylog_seek_pointer):
     """Read from ttylog. If lines have '\r' at end, remove that '\r'. Return the read lines"""
     ttylog_file = open(ttylog,'r',errors='ignore', newline='\n')
@@ -64,6 +87,7 @@ def get_ttylog_lines_from_file(ttylog, ttylog_seek_pointer):
         return ttylog_lines_file, ttylog_bytes_read
     #Replace escaped double qoutes with qoutes
     ttylog_read_data = ttylog_read_data.replace(r'\"','"')
+    ttylog_read_data = remove_alternate_screen(ttylog_read_data)
     ttylog_lines = ttylog_read_data.split('\n')
 
     for line in ttylog_lines:
@@ -369,7 +393,7 @@ def get_ttylog_lines_to_decode(ttylog_lines_read_next, ttylog_lines_from_file, c
     # Make a Reverse copy of the ttylog_lines_from_file list
     ttylog_next_reverse = ttylog_lines_read_next[::-1]
     for count, line in enumerate(ttylog_next_reverse):
-        if r'END tty_sid' in line:
+        if line.rstrip().endswith('END ' + current_session_id):
             ttylog_lines_to_decode = ttylog_lines_read_next[::]
             ttylog_lines_read_next = []
             return ttylog_lines_to_decode, ttylog_lines_read_next
@@ -687,7 +711,7 @@ if __name__ == "__main__":
     # This dictionary will be used to uniquely identif a row in CSV file
     unique_id_dict = get_unique_id_dict()
     # Get github local user directory
-    github_local_user_directory, github_global_user_directory = get_github_user_directory(github_repo_name='upload_modified_files', local_dir_to_clone_github='/tmp/')
+    github_local_user_directory, github_global_user_directory = None, None
     # If the github user directory exists, create a queue, and create and start a deamon thread
     if github_local_user_directory:
         files_list_queue = queue.Queue()
@@ -784,8 +808,8 @@ if __name__ == "__main__":
                 tline = rexp.sub('', line)
                 line = tline
 
-            command_pattern_user_prompt = re.compile("{}:.*?".format(user_initial_prompt.casefold())) 
-            command_pattern_root_prompt = re.compile("{}:.*?".format(root_prompt.casefold()))
+            command_pattern_user_prompt = re.compile(r"{}:[^$]*\$".format(re.escape(user_initial_prompt.casefold())))
+            command_pattern_root_prompt = re.compile(r"{}:[^#]*#".format(re.escape(root_prompt.casefold())))
 
             tstampre = re.compile(";\d{9}")
 
@@ -808,7 +832,7 @@ if __name__ == "__main__":
 
             # Check if there is end
             end = False
-            if r'END tty_sid' in line:
+            if line.rstrip().endswith('END ' + current_session_id):
                 end = True
                 
             #print("Line ", line, " prompt ", prompt, " input cmd ", input_cmd)
@@ -885,7 +909,8 @@ if __name__ == "__main__":
                         files_list_queue.put([input_cmd, unique_row_id, github_local_user_directory, github_files_path_list, current_home_dir, current_line_prompt, node_name])
                 output_txt = ''
             elif not end:
-                output_txt += '\n'+line
+                if line.strip().casefold() not in (user_initial_prompt, root_prompt.casefold()):
+                    output_txt += '\n'+line
             else:
                 # End, save what we can
                 if len(output_txt) > 500:
@@ -899,6 +924,7 @@ if __name__ == "__main__":
                     #logfile.write("Logged input "+ttylog_sessions[current_session_id]['lines'][cline]['cmd']+"\n")
                     #logfile.write("Logged output "+ttylog_sessions[current_session_id]['lines'][cline]['output']+"\n")
                     #logfile.close()
+                exit_flag = True
             first_ttylog_line = False
 
         time.sleep(0.1)
