@@ -4,15 +4,22 @@ Last updated: 2026-09-14
 
 ## Status
 
-**Fixed and verified on the testbed.** SSH sessions are now fully recorded
-in the trace file, and `analyze_continuous.py` writes one CSV row per
-command, including the last one (`exit`).
+**Fixed and verified on a fresh testbed.** SSH sessions are now fully
+recorded in the trace file, and `analyze_continuous.py` writes one CSV row
+per command, including the last one (`exit`).
 
-The changes were first made by hand on a testbed, in the installed copies
-under `/usr/local/src/`. They were then applied to `ttylog_src/` on the
-`feat/rithvik_fix` branch of the fork `RithvikR1218/ACSLE`. That branch's
-files were checked against the "Validating a commit" section below, and
-still need an end-to-end run on a fresh testbed installed from the branch.
+History:
+1. The changes were first made by hand on a testbed, in the installed copies
+   under `/usr/local/src/`.
+2. They were applied to `ttylog_src/` on the `feat/rithvik_fix` branch of the
+   fork `RithvikR1218/ACSLE`, committed as `fa91fa6` ("fix: trace and csv
+   file generation"), and checked with "Validating a commit" below.
+3. A new testbed was installed from that branch, and the end-to-end tests
+   passed (see "Results").
+
+The original repo `STEELISI/ACSLE` is unchanged. The account `RithvikR1218`
+only has read access there, so the fix goes upstream through a pull request
+from the fork (see "Next steps").
 
 Only two files changed: `start_ttylog.sh` and `analyze_continuous.py`.
 `script.sh` and `ttylog/ttylog` (the Perl script) are unchanged.
@@ -26,7 +33,7 @@ of full-screen editors are dropped.
 
 ```
 sshd ForceCommand
-  -> /usr/local/src/script.sh
+  -> script.sh   (wherever ForceCommand points, e.g. /usr/local/src/ttylog/script.sh)
        -> bash -l -O huponexit /usr/local/src/start_ttylog.sh
             start_up():
               - picks a session number (CNT) from /var/log/ttylog/count.$USER
@@ -348,9 +355,7 @@ Result:
                 exit_flag = True
 ```
 
-## Install instructions (corrected)
-
-The original instructions copied `script.sh` to the wrong directory.
+## Install instructions (as used on the fresh testbed)
 
 ```sh
 sudo apt update && sudo apt install strace -y
@@ -359,17 +364,33 @@ sudo mkdir -p /usr/local/src/ttylog /var/log/ttylog
 sudo cp ACSLE/ttylog_src/analyze_continuous.py /usr/local/src/
 sudo cp ACSLE/ttylog_src/ttylog/ttylog /usr/local/src/ttylog/
 sudo cp ACSLE/ttylog_src/start_ttylog.sh /usr/local/src/
-sudo cp ACSLE/ttylog_src/script.sh /usr/local/src/        # was /usr/local/src/ttylog/ (wrong)
-sudo chmod +x /usr/local/src/script.sh /usr/local/src/start_ttylog.sh /usr/local/src/ttylog/ttylog
+sudo cp ACSLE/ttylog_src/script.sh /usr/local/src/ttylog/
+sudo chmod +x /usr/local/src/ttylog/script.sh /usr/local/src/start_ttylog.sh /usr/local/src/ttylog/ttylog
 
-sudo su
-echo "" >> /etc/ssh/sshd_config
-echo 'ForceCommand /usr/local/src/script.sh "$SSH_ORIGINAL_COMMAND"' >> /etc/ssh/sshd_config
-echo "" >> /etc/ssh/sshd_config
-systemctl restart sshd
+echo 'ForceCommand /usr/local/src/ttylog/script.sh "$SSH_ORIGINAL_COMMAND"' | sudo tee -a /etc/ssh/sshd_config
+sudo sshd -t && sudo systemctl restart sshd    # use `ssh` instead of `sshd` if the unit isn't found
 ```
-Assumptions: Ubuntu, bash, the default `user@host:cwd$` prompt, and
-passwordless sudo for every user who should be logged (see Open items).
+
+Notes:
+- **`script.sh` can live anywhere**, as long as `ForceCommand` points to the
+  same path. The paths the scripts *do* depend on are
+  `/usr/local/src/start_ttylog.sh` (hardcoded in `script.sh`),
+  `/usr/local/src/ttylog/ttylog` and `/usr/local/src/analyze_continuous.py`
+  (both hardcoded in `start_ttylog.sh`).
+- **The `chmod` is a safety net.** git already stores `script.sh`,
+  `start_ttylog.sh`, `ttylog/ttylog` and `analyze_continuous.py` as
+  executable (mode 100755), and `cp` keeps that. The original instructions
+  ran `chmod +x script.sh` from `/usr/local/src`, which failed harmlessly
+  once `script.sh` was in `ttylog/`.
+- **`ForceCommand` applies to every SSH login, including the admin's.** A
+  wrong path or a non-executable script makes every new login fail. Keep
+  the session you installed from open until a new login works. `sshd -t`
+  checks the config before the restart.
+- **Watch out for `Match` blocks.** Lines appended after a `Match` block in
+  `sshd_config` apply only to that block. Ubuntu's default file has none.
+- **Assumptions:** Ubuntu, bash, the default `user@host:cwd$` prompt, and
+  passwordless sudo for every user who should be logged (see Known
+  limitations).
 
 ## Validating a commit
 
@@ -424,31 +445,75 @@ indentation mistake still compiles but behaves wrongly.
 
 ### 2. End-to-end tests (on the testbed, after installing the committed files)
 
-Use a new SSH session for each test. To find the latest session's files:
+**Setup.** Keep one session open as the **checker**. The session you
+installed from works well: it was opened before `ForceCommand` was added,
+so it isn't logged, and its own output can't mix with the test traces. Do
+each test in a **new** SSH session.
+
+In the checker, define a helper (set `U` to the test user):
 ```sh
-N=$(ls -t /var/log/ttylog/*.trace | head -1 | sed 's/.*\.\([0-9]*\)\.trace/\1/')
-sudo cat -v /var/log/ttylog/*.$USER.$N.trace
-sudo cat /var/log/ttylog/*.$USER.$N.err
-sudo cat /var/log/analyze_cont/analyze.$USER.$N.csv
-ps aux | grep -E 'analyze_continuous|strace' | grep -v grep
+U=rithvikr1218
+show() {
+  echo "== trace $1 =="; sudo cat -v /var/log/ttylog/*.$U.$1.trace
+  echo "== err $1 ==";   sudo cat /var/log/ttylog/*.$U.$1.err
+  echo "== csv $1 ==";   sudo cat /var/log/analyze_cont/analyze.$U.$1.csv
+  echo "== leftover processes =="; ps aux | grep -E 'strace|ttylog/ttylog|analyze_continuous' | grep -v grep
+}
 ```
+`show N` prints session N's trace, error log and CSV, plus any logging
+processes still running.
 
-| Test | Commands in the session | Expected |
+In each test session, run `echo $TTY_SID` first. `start_ttylog.sh` exports
+the session number under that name, so you know which N to pass to `show`.
+It also adds one row to the CSV.
+
+When copying commands, replace placeholders like `<N>` with real values
+before running them. Pasted literally, bash reads `<name` as input
+redirection from a file.
+
+| Test | Commands in the test session | Expected |
 |---|---|---|
-| Basic capture | `ls`, `pwd`, `echo hello`, `exit` | Trace has every command and output, then `END tty_sid:N`. Header says `User prompt is <user>@<shorthost>`. No `DEBUG:` lines in the trace (they're in `.err`). CSV has 4 rows, `exit` included. No trailing `user@host` line in outputs. No analyzer or strace left running afterwards. |
-| Processes detached | Mid-session, from another shell: `ps -eo pid,sid,tty,stat,args \| grep -E 'strace\|ttylog/ttylog\|analyze_continuous' \| grep -v grep` | strace, the ttylog decoder and analyze_continuous.py are alive, and the TTY column shows `?`. |
-| Full-screen program (P1) | `ls`, `nano <some old .trace file>` (type or paste the path, don't use Tab), quit with Ctrl-X, `pwd`, `exit` | The `nano` row has empty output. No fake rows from the file's contents. |
-| Crash protection (P3) | `echo "<user>@<shorthost>:/tmp"`, `pwd`, `exit` | The `echo` row's output is `<user>@<shorthost>:/tmp`, and the `pwd` and `exit` rows exist. |
-| Foreign END line (P2) | `grep END /var/log/ttylog/*.$USER.<older N>.trace`, `ls`, `exit` | Rows for `grep`, `ls` and `exit` all exist. |
-| Counter (S1) | `sudo cat /var/log/ttylog/count.$USER` after logging in | Equals this session's N, which is one higher than the previous session. After `sudo rm /var/log/ttylog/count.$USER` and a new login, N is the next unused number, not 0. |
+| Basic capture | `echo $TTY_SID`, `ls`, `pwd`, `echo hello`, `exit` | Trace has every command and output, then `END tty_sid:N`. Header says `User prompt is <user>@<shorthost>`. No `DEBUG:` lines in the trace (they're in `.err`, with `TTY EOF`). CSV has one row per command, `exit` included. No trailing bare `user@host` line in outputs. No leftover processes after `exit`. |
+| Processes detached | Before exiting the basic-capture session, in the checker: `ps -eo pid,sid,tty,stat,args \| grep -E 'strace\|ttylog/ttylog\|analyze_continuous' \| grep -v grep` | strace, the ttylog decoder and analyze_continuous.py are alive, and the TTY column shows `?`. |
+| Full-screen program (P1) | `echo $TTY_SID`, `ls`, `nano /var/log/ttylog/<an existing .trace>`, scroll, quit with Ctrl-X, `pwd`, `exit` | The `nano` row has empty output. No fake rows from the displayed file, even though it contains prompts and an `END` line. |
+| Crash protection (P3) | `echo $TTY_SID`, `echo "$USER@$(hostname -s):/tmp"`, `pwd`, `exit` | The `echo` row's output is `<user>@<shorthost>:/tmp`, and the `pwd` and `exit` rows exist. |
+| Foreign END line (P2) | `echo $TTY_SID`, `grep END /var/log/ttylog/*.$USER.0.trace` (any older session number), `ls`, `exit` | The `grep` row's output is `END tty_sid:0`, and the `ls` and `exit` rows exist. |
+| Counter (S1) | In the checker: `sudo cat /var/log/ttylog/count.$U`, then `sudo rm /var/log/ttylog/count.$U`, then a new login running `echo $TTY_SID` | The counter equals the latest N. After deleting it, the next session gets the next unused number (not 0), and the counter file is recreated. |
+| Non-interactive SSH (optional) | From another machine: `ssh <user>@<testbed> hostname` | Prints the hostname and creates a new trace with the command, its output and `END`. |
 
-### Results observed on 2026-09-14 (testbed host `a`, user `rithvikr1218`)
+## Results
 
-- Session 13: first full capture after S4/S5.
-- Session 14: CSV correct after S2/S3/P5, but missing the last two rows (fixed by S6/P6).
-- Session 17: counter continued correctly after S1. P2 held with trace 15 shown in `nano`. It also exposed the fake-row and tab-completion issues.
-- Session with `ls`, `pwd`, `echo test`, `nano ...15.trace`, `exit`: 5 correct rows, empty `nano` output, no trailing prompts, analyzer exited (P1, P4, P6).
-- Session with `rithvikr1218@a:/tmp` (as a command), `echo "rithvikr1218@a:/tmp"`, `pwd`, `exit`: 4 correct rows. The bash error output containing `user@host:` didn't crash the analyzer (P3).
+### First testbed: changes applied by hand (2026-09-14, host `a`, user `rithvikr1218`)
+
+- **Session 13:** first full capture after S4/S5.
+- **Session 14:** CSV correct after S2/S3/P5, but missing the last two rows (fixed by S6/P6).
+- **Session 17:** counter continued correctly after S1. P2 held with trace 15 shown in `nano`; this was before P1, so the displayed `END tty_sid:15` did reach the analyzer. The session also exposed the fake-row and tab-completion issues.
+- **`ls`, `pwd`, `echo test`, `nano ...15.trace`, `exit`:** 5 correct rows, empty `nano` output, no trailing prompts, analyzer exited (P1, P4, P6).
+- **`rithvikr1218@a:/tmp` (as a command), `echo "rithvikr1218@a:/tmp"`, `pwd`, `exit`:** 4 correct rows. The bash error output containing `user@host:` didn't crash the analyzer (P3).
+
+### Fresh testbed: installed from `feat/rithvik_fix` @ `fa91fa6` (2026-09-14)
+
+Hostname `a.infra.fixedttylog.fixedttylog.discernubuntu`, user `rithvikr1218`,
+installed with the instructions above (`script.sh` in `/usr/local/src/ttylog/`).
+Checks were run from the unlogged install session.
+
+- **Session 0 (basic capture, detached processes):**
+  - Mid-session, `sudo ttylog`, strace, the decoder and both analyze_continuous.py processes were alive with TTY `?`, each group in its own session (SID = its sudo PID).
+  - Commands run: `ls`, `pwd`, `echo hello`, `echo $TTY_SID`, `ls`, `pwd`, and an `echo hello` typed with a typo corrected by backspaces (`ehco hk`), then `exit`.
+  - All 8 CSV rows correct. The corrected typo was recorded as `echo hello`.
+  - `DEBUG:` lines and `TTY EOF` appeared only in `.err`. No leftover processes.
+- **Session 1 (P1):**
+  - `echo $TTY_SID` and `ls`, then four `nano` runs:
+    - two on filenames that don't exist in `~` (`nano` showed `[ New File ]`)
+    - two on `/var/log/ttylog/...0.trace`, which displayed trace 0's prompts and `END tty_sid:0`
+  - Then `pwd` and `exit`.
+  - All four `nano` rows have empty output, with no fake rows. The last two rows are identical because the command really ran twice. `pwd` and `exit` rows present.
+- **Session 2 (P3):** `echo "$USER@$(hostname -s):/tmp"` produced a row with output `rithvikr1218@a:/tmp`, and the later `ls` and `exit` rows were present.
+  - The P2 command was pasted with its `<test 1 N>` placeholder, so bash treated `<test` as input redirection and printed `bash: test: No such file or directory`.
+  - The foreign-END check therefore wasn't exercised on this testbed. P2 was covered on the first testbed (session 17) and by the synthetic-trace run.
+- **Counter (S1):** read 2 after session 2. After `sudo rm` of the counter, the next login got session number 3 (not 0) and the counter file was recreated.
+- **Session 3:** still open when testing stopped. Its logging processes were running and detached. Its CSV and the final leftover-process check weren't reviewed, and the tester judged the results sufficient.
+- **Not run:** the optional non-interactive SSH / `scp -O` check.
 
 ## Known limitations and open items (not addressed yet)
 
@@ -487,6 +552,30 @@ ps aux | grep -E 'analyze_continuous|strace' | grep -v grep
    `;<epoch>` value in the trace. During a live session they're within about
    a second of each other. If `analyze_continuous.py` is re-run later on an
    old trace, every row gets the re-run time. The trace's own timestamp is
-   already parsed into `line_timestamp` and could be used instead.
-9. Minor: output is still capped at 500 characters per command (original
-   behavior), and `TTY EOF` plus `DEBUG:` lines go to the `.err` file.
+   already parsed into `line_timestamp` and could be used instead. Note
+   that the ttylog decoder only adds `;<epoch>` to output chunks starting
+   with a newline. For commands pasted into the terminal (bracketed paste),
+   the marker lands on the first output line rather than the command line,
+   so that fix would need to handle both positions. The CSV isn't affected
+   today, because the analyzer strips the marker from output.
+9. **Non-interactive SSH wasn't retested.** `ssh host <command>`, `scp`
+   and `sftp` use other branches of `start_ttylog.sh`. They call the
+   changed `start_up()` but were not exercised after the changes. Newer
+   `scp` uses the SFTP protocol, which the script's `sftp` check (matching
+   commands that start with `sftp`) likely doesn't recognize; `scp -O`
+   uses the older protocol that the `scp` branch handles.
+10. Minor: output is still capped at 500 characters per command (original
+    behavior), and `TTY EOF` plus `DEBUG:` lines go to the `.err` file.
+
+## Next steps
+
+- **Upstream the fix.** Open a pull request from
+  `RithvikR1218:feat/rithvik_fix` into `STEELISI/ACSLE` `master`
+  (`gh pr create --repo STEELISI/ACSLE --base master --head RithvikR1218:feat/rithvik_fix`),
+  or ask a STEELISI owner for write access.
+- **Decide on the open items before wide rollout.** Items 1 (sudo) and 2
+  (privacy) matter most for industry researchers and students. Items 3
+  (tmux) and 4 (tab completion) affect data quality.
+- **The reference clone `~/USC/STEEL/ACSLE` has the original, unfixed code.**
+  It holds an untracked copy of this file. The fork's copy on
+  `feat/rithvik_fix` is the one to keep up to date.
