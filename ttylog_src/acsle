@@ -1,0 +1,352 @@
+#!/usr/bin/env python3
+
+"""Browse the sessions recorded by ttylog.
+
+Reads the traces in TRACE_DIR (ttylog.<host>.<user>.<N>.trace) and the
+per-command CSVs in CSV_DIR (analyze.<user>.<N>.csv), with both directories
+taken from /etc/acsle/acsle.conf. Never modifies anything.
+"""
+
+import argparse
+import csv
+import datetime
+import glob
+import json
+import os
+import pwd
+import re
+import signal
+import sys
+
+CONF_PATH = os.environ.get('ACSLE_CONF', '/etc/acsle/acsle.conf')
+DEFAULTS = {
+    'TRACE_DIR': '/var/log/ttylog',
+    'CSV_DIR': '/var/log/analyze_cont',
+}
+
+# Column order written by write_to_csv() in analyze_continuous.py
+CSV_FIELDS = ['id', 'node', 'timestamp', 'cwd', 'command', 'output', 'prompt']
+
+ANSI_RE = re.compile(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)'   # OSC (window title)
+                     r'|\x1b\[[0-?]*[ -/]*[@-~]'            # CSI (colors, cursor)
+                     r'|\x1b[@-Z\\-_=>]')                   # other 2-byte escapes
+EPOCH_MARK_RE = re.compile(r';\d{9,10}(?=\r?\n|$)')
+ALT_SCREEN_ON, ALT_SCREEN_OFF = '\x1b[?1049h', '\x1b[?1049l'
+
+
+def load_config():
+    conf = dict(DEFAULTS)
+    try:
+        with open(CONF_PATH) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                key, value = line.split('=', 1)
+                conf[key.strip()] = value.strip().strip('"\'')
+    except FileNotFoundError:
+        pass
+    return conf
+
+
+class Session:
+    def __init__(self, trace_path, host, user, number):
+        self.trace_path = trace_path
+        self.host = host
+        self.user = user
+        self.number = number
+        self.csv_path = None
+        self._rows = None
+        self._head = None
+        self._tail = None
+
+    @property
+    def short_host(self):
+        return self.host.split('.')[0]
+
+    def _read_edges(self):
+        if self._head is not None:
+            return
+        with open(self.trace_path, 'r', errors='replace') as f:
+            self._head = f.read(65536)
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - 512))
+            self._tail = f.read()
+
+    @property
+    def home(self):
+        self._read_edges()
+        m = re.search(r'^Home directory is (\S+)', self._head, re.M)
+        return m.group(1) if m else None
+
+    @property
+    def closed(self):
+        self._read_edges()
+        return 'END tty_sid:{}'.format(self.number) in self._tail
+
+    @property
+    def start(self):
+        """Epoch of the first timestamped line, else of the first CSV row, else file mtime"""
+        self._read_edges()
+        m = re.search(r';(\d{9,10})(?:\r?\n|$)', self._head)
+        if m:
+            return int(m.group(1))
+        rows = self.rows()
+        if rows and rows[0]['timestamp'].isdigit():
+            return int(rows[0]['timestamp'])
+        return int(os.path.getmtime(self.trace_path))
+
+    @property
+    def last_activity(self):
+        return int(os.path.getmtime(self.trace_path))
+
+    def rows(self):
+        if self._rows is None:
+            self._rows = []
+            if self.csv_path:
+                with open(self.csv_path, newline='', errors='replace') as f:
+                    for rec in csv.reader(f, delimiter=',', quotechar='%'):
+                        rec = (rec + [''] * len(CSV_FIELDS))[:len(CSV_FIELDS)]
+                        row = dict(zip(CSV_FIELDS, rec))
+                        # analyze_continuous.py starts every output with a newline
+                        row['output'] = row['output'][1:] if row['output'].startswith('\n') else row['output']
+                        self._rows.append(row)
+        return self._rows
+
+    def short_path(self, path):
+        home = self.home
+        if home and (path == home or path.startswith(home + '/')):
+            return '~' + path[len(home):]
+        return path
+
+
+def discover(conf):
+    sessions = []
+    for path in glob.glob(os.path.join(conf['TRACE_DIR'], 'ttylog.*.trace')):
+        name = os.path.basename(path)[len('ttylog.'):-len('.trace')]
+        parts = name.rsplit('.', 2)   # the host part may itself contain dots
+        if len(parts) != 3 or not parts[2].isdigit():
+            continue
+        s = Session(path, parts[0], parts[1], int(parts[2]))
+        csv_path = os.path.join(conf['CSV_DIR'], 'analyze.{}.{}.csv'.format(s.user, s.number))
+        if os.path.exists(csv_path):
+            s.csv_path = csv_path
+        sessions.append(s)
+    sessions.sort(key=lambda s: (s.user, s.host, s.number))
+    return sessions
+
+
+def current_user():
+    return pwd.getpwuid(os.getuid()).pw_name
+
+
+def filter_sessions(sessions, args):
+    """Non-root users see their own sessions unless --user or --all says otherwise"""
+    user = getattr(args, 'user', None)
+    if user is None and not getattr(args, 'all', False) and os.getuid() != 0:
+        user = current_user()
+    if user:
+        sessions = [s for s in sessions if s.user == user]
+    host = getattr(args, 'host', None)
+    if host:
+        sessions = [s for s in sessions if s.host == host or s.short_host == host]
+    number = getattr(args, 'session', None)
+    if number is not None:
+        sessions = [s for s in sessions if s.number == number]
+    return sessions
+
+
+def pick_one(sessions, args):
+    matches = filter_sessions(sessions, args)
+    if not matches:
+        sys.exit('acsle: no session {} found (try `acsle sessions`{})'.format(
+            args.session, '' if os.getuid() == 0 else ' or sudo'))
+    if len(matches) > 1:
+        options = ', '.join('--user {} --host {}'.format(s.user, s.short_host) for s in matches)
+        sys.exit('acsle: session {} is ambiguous; add one of: {}'.format(args.session, options))
+    return matches[0]
+
+
+def fmt_time(epoch, with_date=True):
+    try:
+        t = datetime.datetime.fromtimestamp(int(epoch))
+    except (TypeError, ValueError):
+        return '?'
+    return t.strftime('%Y-%m-%d %H:%M:%S' if with_date else '%H:%M:%S')
+
+
+def print_table(header, rows):
+    widths = [max(len(str(r[i])) for r in [header] + rows) for i in range(len(header))]
+    for r in [header] + rows:
+        print('  '.join(str(c).ljust(w) for c, w in zip(r, widths)).rstrip())
+
+
+def cmd_sessions(args, sessions):
+    sessions = filter_sessions(sessions, args)
+    if args.since:
+        since = datetime.datetime.strptime(args.since, '%Y-%m-%d').timestamp()
+        sessions = [s for s in sessions if s.start >= since]
+    if not sessions:
+        print('No sessions found.' + ('' if os.getuid() == 0 else ' (Other users\' sessions need --all or sudo.)'))
+        return
+    sessions.sort(key=lambda s: s.start)
+    table = []
+    for s in sessions:
+        table.append([s.number, s.user, s.short_host, fmt_time(s.start), fmt_time(s.last_activity),
+                      len(s.rows()) if s.csv_path else '-', 'closed' if s.closed else 'open'])
+    print_table(['SESSION', 'USER', 'HOST', 'START', 'LAST ACTIVITY', 'CMDS', 'STATUS'], table)
+
+
+def cmd_show(args, sessions):
+    s = pick_one(sessions, args)
+    if not s.csv_path:
+        sys.exit('acsle: session {} has no CSV; use `acsle trace {}`'.format(s.number, s.number))
+    print('Session {} of {}@{}, started {} ({})'.format(
+        s.number, s.user, s.short_host, fmt_time(s.start), 'closed' if s.closed else 'open'))
+    for i, row in enumerate(s.rows(), 1):
+        print('{:>4}  {}  {}$ {}'.format(i, fmt_time(row['timestamp'], with_date=False),
+                                         s.short_path(row['cwd']), row['command']))
+        out = row['output'].splitlines()
+        if args.full:
+            for line in out:
+                print('      ' + line)
+        elif out:
+            more = '  (+{} lines)'.format(len(out) - 1) if len(out) > 1 else ''
+            print('      ' + out[0][:100] + more)
+
+
+def clean_trace(text):
+    """Make a raw trace readable: hide full-screen programs, drop escapes and timestamps"""
+    parts = []
+    while text:
+        start = text.find(ALT_SCREEN_ON)
+        if start == -1:
+            parts.append(text)
+            break
+        parts.append(text[:start])
+        end = text.find(ALT_SCREEN_OFF, start)
+        parts.append('\n[full-screen program output hidden]\n')
+        if end == -1:
+            break
+        text = text[end + len(ALT_SCREEN_OFF):]
+    text = ''.join(parts)
+    text = ANSI_RE.sub('', text)
+    text = EPOCH_MARK_RE.sub('', text)
+    lines = []
+    for line in text.replace('\r', '').replace('\x07', '').split('\n'):
+        buf = []
+        for ch in line:
+            if ch == '\x08':
+                if buf:
+                    buf.pop()
+            else:
+                buf.append(ch)
+        lines.append(''.join(buf))
+    return '\n'.join(lines)
+
+
+def cmd_trace(args, sessions):
+    s = pick_one(sessions, args)
+    with open(s.trace_path, 'r', errors='replace', newline='') as f:
+        text = f.read()
+    sys.stdout.write(text if args.raw else clean_trace(text))
+
+
+def export_rows(sessions):
+    for s in sessions:
+        for row in s.rows():
+            out = {'user': s.user, 'host': s.host, 'session': s.number}
+            out.update(row)
+            out['time'] = fmt_time(row['timestamp'])
+            yield out
+
+
+def cmd_export(args, sessions):
+    sessions = filter_sessions(sessions, args)
+    fields = ['user', 'host', 'session', 'id', 'node', 'timestamp', 'time', 'cwd', 'command', 'output', 'prompt']
+    out = open(args.output, 'w', newline='') if args.output else sys.stdout
+    try:
+        if args.format == 'csv':
+            writer = csv.DictWriter(out, fieldnames=fields)
+            writer.writeheader()
+            for row in export_rows(sessions):
+                writer.writerow(row)
+        elif args.format == 'json':
+            json.dump(list(export_rows(sessions)), out, indent=2)
+            out.write('\n')
+        else:
+            for row in export_rows(sessions):
+                out.write(json.dumps(row) + '\n')
+    finally:
+        if args.output:
+            out.close()
+
+
+def cmd_grep(args, sessions):
+    pattern = re.compile(args.pattern, re.I if args.ignore_case else 0)
+    found = False
+    for s in filter_sessions(sessions, args):
+        for row in s.rows():
+            if pattern.search(row['command']) or (args.output and pattern.search(row['output'])):
+                found = True
+                print('{}:{}  {}  {}$ {}'.format(s.user, s.number, fmt_time(row['timestamp']),
+                                                 s.short_path(row['cwd']), row['command']))
+    if not found:
+        sys.exit(1)
+
+
+def main():
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)   # quiet exit on `acsle ... | head`
+
+    def add_filters(p, session=False):
+        p.add_argument('-u', '--user', help='only this user (default: you, or everyone for root)')
+        p.add_argument('-a', '--all', action='store_true', help="include other users' sessions")
+        p.add_argument('--host', help='only this host (full or short name)')
+        if session:
+            p.add_argument('-s', '--session', type=int, help='only this session number')
+
+    parser = argparse.ArgumentParser(prog='acsle', description='Browse sessions recorded by ttylog.')
+    sub = parser.add_subparsers(dest='command', metavar='COMMAND')
+    sub.required = True
+
+    p = sub.add_parser('sessions', aliases=['ls'], help='list recorded sessions')
+    add_filters(p)
+    p.add_argument('--since', metavar='YYYY-MM-DD', help='only sessions started on or after this date')
+    p.set_defaults(func=cmd_sessions)
+
+    p = sub.add_parser('show', help='commands and output of one session')
+    p.add_argument('session', type=int, help='session number (see `acsle sessions`)')
+    add_filters(p)
+    p.add_argument('-f', '--full', action='store_true', help='print the full output of every command')
+    p.set_defaults(func=cmd_show)
+
+    p = sub.add_parser('trace', help='print the terminal trace of one session')
+    p.add_argument('session', type=int, help='session number (see `acsle sessions`)')
+    add_filters(p)
+    p.add_argument('--raw', action='store_true', help='print the trace file unmodified')
+    p.set_defaults(func=cmd_trace)
+
+    p = sub.add_parser('export', help='merge session CSVs into one CSV/JSON file')
+    add_filters(p, session=True)
+    p.add_argument('--format', choices=['csv', 'json', 'jsonl'], default='csv')
+    p.add_argument('-o', '--output', help='write to this file instead of stdout')
+    p.set_defaults(func=cmd_export)
+
+    p = sub.add_parser('grep', help='search commands across sessions')
+    p.add_argument('pattern', help='regular expression')
+    add_filters(p, session=True)
+    p.add_argument('-i', '--ignore-case', action='store_true')
+    p.add_argument('-o', '--output', action='store_true', help='also search command output')
+    p.set_defaults(func=cmd_grep)
+
+    args = parser.parse_args()
+    conf = load_config()
+    try:
+        args.func(args, discover(conf))
+    except PermissionError as e:
+        sys.exit('acsle: {}: permission denied (try sudo)'.format(e.filename))
+
+
+if __name__ == '__main__':
+    main()

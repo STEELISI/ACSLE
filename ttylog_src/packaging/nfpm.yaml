@@ -1,0 +1,38 @@
+# Builds .deb, .rpm, .apk and Arch packages from the `make install` layout.
+# Run from ttylog_src/:  make packages VERSION=1.0.0
+name: acsle-ttylog
+version: ${VERSION}
+arch: all
+platform: linux
+section: admin
+maintainer: Rthvik <rithvik.ravilla@gmail.com>
+description: |
+  Records SSH terminal sessions with strace (ttylog) and turns them into
+  per-command CSVs. Includes the `acsle` CLI to browse, search and export them.
+homepage: https://github.com/STEELISI/ACSLE
+license: GPL-2.0
+
+depends: [bash, strace, perl, python3, openssh-server, sudo, procps]
+overrides:
+  rpm:
+    depends: [bash, strace, perl, python3, openssh-server, sudo, procps-ng]
+  archlinux:
+    depends: [bash, strace, perl, python, openssh, sudo, procps-ng]
+
+contents:
+  - src: build/usr/lib/acsle
+    dst: /usr/lib/acsle
+    type: tree
+  - src: build/usr/bin/acsle
+    dst: /usr/bin/acsle
+  - src: build/etc/acsle/acsle.conf
+    dst: /etc/acsle/acsle.conf
+    type: config|noreplace
+  - dst: /var/log/ttylog
+    type: dir
+  - dst: /var/log/analyze_cont
+    type: dir
+
+scripts:
+  postinstall: packaging/postinstall.sh
+  preremove: packaging/preremove.sh

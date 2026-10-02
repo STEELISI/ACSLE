@@ -1,6 +1,6 @@
 # ttylog / analyze_continuous — debugging notes
 
-Last updated: 2026-09-14
+Last updated: 2026-09-25
 
 ## Status
 
@@ -33,8 +33,9 @@ of full-screen editors are dropped.
 
 ```
 sshd ForceCommand
-  -> script.sh   (wherever ForceCommand points, e.g. /usr/local/src/ttylog/script.sh)
-       -> bash -l -O huponexit /usr/local/src/start_ttylog.sh
+  -> /usr/lib/acsle/script.sh
+       -> bash -l -O huponexit /usr/lib/acsle/start_ttylog.sh   (next to script.sh)
+            paths come from /etc/acsle/acsle.conf (TRACE_DIR, CSV_DIR, ...)
             start_up():
               - picks a session number (CNT) from /var/log/ttylog/count.$USER
               - writes 3 header lines to the trace:
@@ -355,7 +356,18 @@ Result:
                 exit_flag = True
 ```
 
-## Install instructions (as used on the fresh testbed)
+## Install instructions
+
+**Use `install.sh` now; see `INSTALL.md`.** It installs to `/usr/lib/acsle`,
+reads paths from `/etc/acsle/acsle.conf`, and puts `ForceCommand` in
+`/etc/ssh/sshd_config.d/50-acsle.conf` (or a marked block above any `Match`
+block). It also replaces the old `/usr/local/src/ttylog/script.sh` line
+automatically. The scripts no longer hardcode any path: `script.sh` finds
+`start_ttylog.sh` next to itself, and `start_ttylog.sh` finds sftp-server at
+runtime in the distro's usual location.
+
+The manual install below is what the fresh testbed used (with the old
+`/usr/local/src` paths, before `install.sh` existed):
 
 ```sh
 sudo apt update && sudo apt install strace -y
@@ -372,22 +384,13 @@ sudo sshd -t && sudo systemctl restart sshd    # use `ssh` instead of `sshd` if 
 ```
 
 Notes:
-- **`script.sh` can live anywhere**, as long as `ForceCommand` points to the
-  same path. The paths the scripts *do* depend on are
-  `/usr/local/src/start_ttylog.sh` (hardcoded in `script.sh`),
-  `/usr/local/src/ttylog/ttylog` and `/usr/local/src/analyze_continuous.py`
-  (both hardcoded in `start_ttylog.sh`).
-- **The `chmod` is a safety net.** git already stores `script.sh`,
-  `start_ttylog.sh`, `ttylog/ttylog` and `analyze_continuous.py` as
-  executable (mode 100755), and `cp` keeps that. The original instructions
-  ran `chmod +x script.sh` from `/usr/local/src`, which failed harmlessly
-  once `script.sh` was in `ttylog/`.
 - **`ForceCommand` applies to every SSH login, including the admin's.** A
   wrong path or a non-executable script makes every new login fail. Keep
   the session you installed from open until a new login works. `sshd -t`
   checks the config before the restart.
 - **Watch out for `Match` blocks.** Lines appended after a `Match` block in
   `sshd_config` apply only to that block. Ubuntu's default file has none.
+  `install.sh` handles this for you.
 - **Assumptions:** Ubuntu, bash, the default `user@host:cwd$` prompt, and
   passwordless sudo for every user who should be logged (see Known
   limitations).
@@ -396,11 +399,11 @@ Notes:
 
 ### 0. If you edited the installed files on a server, copy them into the clone first
 
-Edits made in `/usr/local/src/` are not in the git clone. Before committing
+Edits made in `/usr/lib/acsle/` (or `/usr/local/src/` on old installs) are not in the git clone. Before committing
 from a server, copy them back into the clone and check the diff:
 ```sh
-cp /usr/local/src/start_ttylog.sh ~/ACSLE/ttylog_src/start_ttylog.sh
-cp /usr/local/src/analyze_continuous.py ~/ACSLE/ttylog_src/analyze_continuous.py
+cp /usr/lib/acsle/start_ttylog.sh ~/ACSLE/ttylog_src/start_ttylog.sh
+cp /usr/lib/acsle/analyze_continuous.py ~/ACSLE/ttylog_src/analyze_continuous.py
 cd ~/ACSLE && git diff --stat
 ```
 Expected: only `ttylog_src/start_ttylog.sh` and `ttylog_src/analyze_continuous.py` changed.
