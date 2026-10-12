@@ -17,8 +17,35 @@ if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
     echo "acsle-record: run it as yourself, not with sudo" >&2
     exit 1
 fi
-if [ -z "${SSH_TTY:-}" ]; then
-    echo "acsle-record: run this from an interactive SSH session (ssh -t)" >&2
+# ttylog traces the sshd process that owns this terminal, so this shell must
+# run directly on an SSH terminal: sshd must be an ancestor, with no tmux,
+# screen or editor-spawned terminal in between.
+case $(tty 2>/dev/null) in
+    /dev/pts/*) ;;
+    *) echo "acsle-record: no terminal; connect with ssh (use ssh -t when giving a command)" >&2
+       exit 1 ;;
+esac
+pid=$$
+on_ssh=0
+while [ -n "$pid" ] && [ "$pid" -gt 1 ]; do
+    case $(ps -o comm= -p "$pid") in
+        sshd*) on_ssh=1; break ;;
+        tmux*|screen*) break ;;
+    esac
+    pid=$(ps -o ppid= -p "$pid" | tr -d ' ')
+done
+if [ "$on_ssh" -eq 0 ]; then
+    if [ -n "${TMUX:-}" ] || [ -n "${STY:-}" ]; then
+        why="inside tmux/screen"
+    elif [ -n "${JUPYTERHUB_USER:-}${JPY_PARENT_PID:-}" ]; then
+        why="in a Jupyter terminal"
+    elif [ "${TERM_PROGRAM:-}" = vscode ]; then
+        why="in a VS Code terminal"
+    else
+        why="not started by sshd (su, sudo -i, a web console, ...)"
+    fi
+    echo "acsle-record: this shell is $why, so ttylog can't trace it." >&2
+    echo "acsle-record: open a plain 'ssh user@host' terminal and run it there" >&2
     exit 1
 fi
 

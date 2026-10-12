@@ -53,6 +53,12 @@ acsle sessions
 acsle show 0
 ```
 
+Install and record on the machine whose sessions you want, for example an
+experiment node, and reach it with a plain `ssh`. ttylog traces the sshd
+process that owns your terminal, so `acsle-record` refuses to run in a
+Jupyter, VS Code, tmux or screen terminal. On SPHERE/Merge, open the XDC's
+Jupyter terminal, `ssh <node>`, then run `acsle-record` on the node.
+
 sshd is never reconfigured or restarted, and no other login is affected.
 Only the shell that `acsle-record` opens is recorded. To remove everything
 later, run `sudo ACSLE/ttylog_src/install.sh --uninstall`. It only edits the

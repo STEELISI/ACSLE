@@ -19,8 +19,21 @@
 # This code preprocesses the ttylog output moving files from local node
 # to a shared folder, and calls analyze.py
 
+import glob
 import os
 import time
+
+CSV_HEADER = 'id,node,timestamp,cwd,command,output,prompt'
+
+def merge_csv_files(paths, dest):
+    """Concatenate session CSVs into dest, keeping only the first file's header row"""
+    with open(dest, 'w', newline='') as out:
+        for i, path in enumerate(paths):
+            with open(path, newline='', errors='replace') as f:
+                lines = f.readlines()
+            if i > 0 and lines and lines[0].rstrip('\r\n') == CSV_HEADER:
+                lines = lines[1:]
+            out.writelines(lines)
 
 def backup_previous_experiment_files(logs_path, output_csv_path, user_name, exp, host):
     """Append current timestamp to previous ttylog log file, and previous csv file"""
@@ -84,7 +97,7 @@ while True:
             dest_log_name = r"{}.{}.{}.log".format(user_name_file, exp, host)
             dest_output_name = r"{}.{}.{}.csv".format(user_name_file, exp, host)
             os.system(r"cat {}ttylog.{}.* > {}{}".format(ttylog_files_path, user_name_file, ttylog_files_path, dest_log_name) )
-            os.system(r"cat {}analyze.{}.* > {}{}".format(acont_files_path, user_name_file, ttylog_files_path, dest_output_name) )
+            merge_csv_files(sorted(glob.glob(r"{}analyze.{}.*".format(acont_files_path, user_name_file))), ttylog_files_path + dest_output_name)
             #os.system(r"python3 /usr/local/src/analyze.py {}{} {}{}".format(ttylog_files_path, dest_log_name, ttylog_files_path, dest_output_name))
             # os.system(r"cp {}{} {}{}".format(ttylog_files_path, dest_log_name, logs_path, dest_log_name) )
             os.system(r"cp {}{} {}{}".format(ttylog_files_path, dest_output_name, output_csv_path, dest_output_name) )

@@ -17,7 +17,8 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-# This code produces a CSV file for user interventions with the following columns
+# This code produces a CSV file for user interventions. The first row holds the
+# column names (CSV_HEADER); every following row has these columns
 # CMBEGIN - fixed value
 # node name
 # epoch timestamp
@@ -649,6 +650,18 @@ def process_files_from_queue():
         files_list_queue.task_done()
 
 
+# Column names, written as the first row of every new CSV. Readers skip this row.
+CSV_HEADER = ['id', 'node', 'timestamp', 'cwd', 'command', 'output', 'prompt']
+
+def write_csv_header():
+    """Write CSV_HEADER if the CSV is new or empty (start_ttylog.sh may have touched it)"""
+    if os.path.exists(csv_output_file) and os.path.getsize(csv_output_file) > 0:
+        return
+    csvfile = open(csv_output_file,'a', newline='')
+    csvwriter = csv.writer(csvfile, delimiter=',', quotechar='%', quoting=csv.QUOTE_MINIMAL)
+    csvwriter.writerow(CSV_HEADER)
+    csvfile.close()
+
 def write_to_csv(line):
     
     csvfile = open(csv_output_file,'a', newline='')
@@ -703,6 +716,7 @@ if __name__ == "__main__":
     ttylog = sys.argv[1]
     #The output CSV file path is stored in 'csv_output_file'
     csv_output_file = sys.argv[2]
+    write_csv_header()
         # if not os.path.isfile(ttylog):
         #     logging.critical("there's a problem with ttylog! aborting.")
         #     exit(1)

@@ -24,7 +24,8 @@ DEFAULTS = {
     'CSV_DIR': '/var/log/analyze_cont',
 }
 
-# Column order written by write_to_csv() in analyze_continuous.py
+# Column order written by write_to_csv() in analyze_continuous.py. New CSVs
+# start with these names as a header row; older ones have no header.
 CSV_FIELDS = ['id', 'node', 'timestamp', 'cwd', 'command', 'output', 'prompt']
 
 ANSI_RE = re.compile(r'\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)'   # OSC (window title)
@@ -107,6 +108,8 @@ class Session:
             if self.csv_path:
                 with open(self.csv_path, newline='', errors='replace') as f:
                     for rec in csv.reader(f, delimiter=',', quotechar='%'):
+                        if rec == CSV_FIELDS:
+                            continue
                         rec = (rec + [''] * len(CSV_FIELDS))[:len(CSV_FIELDS)]
                         row = dict(zip(CSV_FIELDS, rec))
                         # analyze_continuous.py starts every output with a newline

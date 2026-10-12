@@ -118,7 +118,7 @@ The exit code is 1 when nothing matches, so it works in scripts:
 
 ## `acsle export`
 
-Merges sessions into one file with a header row. Unlike the raw
+Merges sessions into one file with a single header row. Unlike the raw
 `analyze.*.csv` files, the export uses standard `"` quoting, so it opens
 directly in Excel, pandas, etc.
 

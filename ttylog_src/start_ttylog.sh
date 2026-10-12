@@ -76,6 +76,9 @@ function clean_up {
         if [[ $PSTRING_KILL =~ ${CONTCSVPATH} ]]; then
             $sudo kill ${PID_CONTCSV} 2>/dev/null
         fi
+        # ttylog is stopped by now, so this isn't recorded in the trace
+        echo "acsle: session $CNT saved"
+        show_paths
         PSTRING_KILL=$(ps -o args -p ${PID_ANNOTATOR} --no-headers 2>/dev/null)
         if [[ $PSTRING_KILL =~ ${ANNOTATORPATH} ]]; then
             $sudo kill ${PID_ANNOTATOR} 2>/dev/null
@@ -86,6 +89,11 @@ function clean_up {
         fi
         exit
     }
+
+function show_paths {
+    echo "acsle:   trace: $LOGPATH"
+    echo "acsle:   csv:   $CONTCSVPATH"
+}
 
 function start_up {
     
@@ -135,10 +143,6 @@ if [ -z "$SSH_ORIGINAL_COMMAND" ]; then
 
     start_up
 
-    setsid $sudo $ACSLE_LIBDIR/ttylog $TTY >> $LOGPATH 2>> $ERRPATH < /dev/null &
-    PID_TTYLOG=$!
-
-
     # Annotator requires existence of a CSV file produced by analyze_continuous.py
     # Create a directory for storing CSV's from analyze_continuous.py
     # This directory is wiped off when the experiment is swapped off
@@ -147,6 +151,14 @@ if [ -z "$SSH_ORIGINAL_COMMAND" ]; then
         $sudo mkdir -p $CONTCSVDIR
     fi
     CONTCSVPATH=${CONTCSVDIR}analyze.$USER.$CNT.csv
+
+    # Printed before ttylog attaches, so it isn't recorded in the trace
+    echo "acsle: recording session $CNT"
+    show_paths
+
+    setsid $sudo $ACSLE_LIBDIR/ttylog $TTY >> $LOGPATH 2>> $ERRPATH < /dev/null &
+    PID_TTYLOG=$!
+
     setsid $sudo python3 $ACSLE_LIBDIR/analyze_continuous.py ${LOGPATH} ${CONTCSVPATH} 2>/dev/null < /dev/null &
     PID_CONTCSV=$!
 
