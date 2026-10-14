@@ -23,6 +23,7 @@ install:
 	for f in $(LIB_EXEC); do install -m 755 $$f $(DESTDIR)$(LIBDIR)/; done
 	for f in $(LIB_DATA); do install -m 644 $$f $(DESTDIR)$(LIBDIR)/; done
 	install -m 755 acsle $(DESTDIR)$(BINDIR)/acsle
+	install -m 755 acsle-record $(DESTDIR)$(BINDIR)/acsle-record
 	@# Keep an existing config; write the new defaults alongside it
 	if [ -e $(DESTDIR)$(CONFDIR)/acsle.conf ]; then \
 		install -m 644 acsle.conf $(DESTDIR)$(CONFDIR)/acsle.conf.new; \
@@ -34,13 +35,14 @@ install:
 
 uninstall:
 	rm -rf $(DESTDIR)$(LIBDIR)
-	rm -f $(DESTDIR)$(BINDIR)/acsle
+	rm -f $(DESTDIR)$(BINDIR)/acsle $(DESTDIR)$(BINDIR)/acsle-record
 	rm -f $(DESTDIR)$(CONFDIR)/acsle.conf.new
 
 check:
 	bash -n start_ttylog.sh
 	bash -n script.sh
 	sh -n install.sh
+	sh -n acsle-record
 	perl -c ttylog/ttylog
 	python3 -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' analyze_continuous.py acsle
 

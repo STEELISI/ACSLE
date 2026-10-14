@@ -21,4 +21,6 @@
 #For sending SIGHUP upon exit, we need to set the shell to interacive (-i), login (-l)
 #huponexit option needs to be set to send SIGHUP to background process on exit
 #start_ttylog.sh is installed next to this script
+#ACSLE_SESSION stops acsle-record from starting a second logger in this session
+export ACSLE_SESSION=1
 bash -l -O huponexit "$(dirname "$(readlink -f "$0")")/start_ttylog.sh"
