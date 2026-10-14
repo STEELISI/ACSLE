@@ -25,6 +25,8 @@ contents:
     type: tree
   - src: build/usr/bin/acsle
     dst: /usr/bin/acsle
+  - src: build/usr/bin/acsle-record
+    dst: /usr/bin/acsle-record
   - src: build/etc/acsle/acsle.conf
     dst: /etc/acsle/acsle.conf
     type: config|noreplace

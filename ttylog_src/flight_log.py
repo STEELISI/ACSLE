@@ -175,6 +175,9 @@ class ProcessCSV:
 
                 # Iterate through every row in CSV
                 for row in csv_reader:
+                    # Skip the header row (column names) that each CSV starts with
+                    if row and row[0] == 'id':
+                        continue
                     exp_name_row, start_time_row, crow = row[0].split(":")
                     if self.exp_name is None and self.start_time is None:
                         self.exp_name = exp_name_row

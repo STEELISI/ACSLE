@@ -30,10 +30,39 @@ applies to every SSH login, including yours.
 |---|---|
 | `--no-restart` | Image builds (Dockerfile, Packer, chroot): the change applies when sshd first starts |
 | `--no-deps` | Dependencies are already installed, or come from your own tooling |
-| `--no-sshd` | Only install the files; set `ForceCommand` yourself |
+| `--no-sshd` | Only install the files; the sshd config is not touched. Record sessions with `acsle-record` (see below) |
 | `--sshd-only` | Only (re)apply the sshd change |
 | `--prefix DIR` | Install under `DIR` instead of `/usr` |
 | `--uninstall [--purge]` | Undo the sshd change and remove the files. `--purge` also deletes `/etc/acsle` and all logs |
+
+### Without changing the sshd config (remote testbeds)
+
+On testbeds where the sshd config must not change, for example when the
+testbed's own tooling connects over SSH, install the files only and record a
+session by hand:
+
+```sh
+# Session 1: install, then record
+sudo ACSLE/ttylog_src/install.sh --no-sshd
+acsle-record           # as yourself, not with sudo; opens a recorded shell
+...                    # run the commands you want recorded
+exit                   # stops recording and returns to your normal shell
+
+# Session 2 (not recorded): check the result
+acsle sessions
+acsle show 0
+```
+
+Install and record on the machine whose sessions you want, for example an
+experiment node, and reach it with a plain `ssh`. ttylog traces the sshd
+process that owns your terminal, so `acsle-record` refuses to run in a
+Jupyter, VS Code, tmux or screen terminal. On SPHERE/Merge, open the XDC's
+Jupyter terminal, `ssh <node>`, then run `acsle-record` on the node.
+
+sshd is never reconfigured or restarted, and no other login is affected.
+Only the shell that `acsle-record` opens is recorded. To remove everything
+later, run `sudo ACSLE/ttylog_src/install.sh --uninstall`. It only edits the
+sshd config if an ACSLE `ForceCommand` is in it.
 
 ### In an image build
 
@@ -71,6 +100,7 @@ removes it on uninstall (but not on upgrade).
 |---|---|
 | `/usr/lib/acsle/` | `script.sh` (the `ForceCommand` target), `start_ttylog.sh`, `ttylog`, `analyze_continuous.py` |
 | `/usr/bin/acsle` | CLI |
+| `/usr/bin/acsle-record` | Records the current session by hand (for `--no-sshd` installs) |
 | `/etc/acsle/acsle.conf` | Log directories. An upgrade never overwrites it; new defaults go to `acsle.conf.new` |
 | `/etc/ssh/sshd_config.d/50-acsle.conf` | The `ForceCommand`. If sshd has no `Include` of that directory, it goes in a `# BEGIN acsle` block in `sshd_config`, above any `Match` block, instead |
 | `/var/log/ttylog/` | `ttylog.<host>.<user>.<N>.trace` (terminal text), `.err` (ttylog debug output), `count.<user>` |
@@ -88,26 +118,15 @@ acsle show <N>            # one line per command
 
 ## Using `acsle`
 
-Regular users see their own sessions. Use `sudo acsle`, or `--all`/`--user` if
-the files are readable, to see everyone's.
-
 ```sh
-acsle sessions [--since 2026-09-01]     # SESSION USER HOST START LAST-ACTIVITY CMDS STATUS
-acsle show 12                           # commands with the first line of output
-acsle show 12 --full                    # full output of every command
-acsle trace 12                          # readable terminal replay (full-screen apps hidden)
-acsle trace 12 --raw                    # the trace file as recorded
-acsle grep 'nmap|ssh ' -i               # search commands across sessions
-acsle grep secret --output              # ...and their output
-acsle export --all --format csv -o all.csv         # one CSV with a header row
-acsle export --user bob --format json              # or json / jsonl
+acsle sessions        # list your sessions and their numbers
+acsle show 3          # commands and output of session 3
+acsle trace 3         # terminal replay of session 3
+acsle grep nmap       # search commands across sessions
+acsle export -o x.csv # merge sessions into one CSV (or --format json)
 ```
 
-Common filters: `-u/--user`, `-a/--all`, `--host`, and `-s/--session` for
-`export`/`grep`. If the same session number exists for several users or hosts,
-`show` and `trace` ask you to add `--user` or `--host`.
-
-Export columns: `user, host, session, id, node, timestamp, time, cwd, command, output, prompt`.
+See **[COMMANDS.md](COMMANDS.md)** for every option, examples, recipes and common mistakes.
 
 ## Uninstall
 

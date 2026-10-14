@@ -5,6 +5,7 @@
 #
 #   sudo ./install.sh                 full install + sshd config + sshd restart
 #   sudo ./install.sh --no-restart    for image builds (Dockerfile, Packer, chroot)
+#   sudo ./install.sh --no-sshd       files only; record a session by hand with acsle-record
 #   sudo ./install.sh --uninstall     undo the sshd change and remove the files (keeps logs)
 #
 # Run ./install.sh --help for all options.
@@ -32,7 +33,7 @@ usage() {
 Usage: sudo $0 [options]
 
   --no-deps      don't install packages (strace, perl, python3, ...)
-  --no-sshd      don't change the sshd config
+  --no-sshd      don't change the sshd config; record sessions with acsle-record
   --sshd-only    only change the sshd config (files already installed)
   --no-restart   don't restart sshd (image builds; takes effect on next boot)
   --prefix DIR   install prefix (default /usr -> /usr/lib/acsle, /usr/bin/acsle)
@@ -121,6 +122,14 @@ remove_sshd_config() {
         "$SSHD_CONFIG"
 }
 
+# True if a ForceCommand from this script (or the old manual install) is in place
+has_sshd_config() {
+    [ -f "$DROPIN" ] && return 0
+    [ -f "$SSHD_CONFIG" ] || return 1
+    grep -q "^$BLOCK_BEGIN\$" "$SSHD_CONFIG" ||
+        grep -Eq '^[[:space:]]*ForceCommand[[:space:]].*/usr/local/src/ttylog/script\.sh' "$SSHD_CONFIG"
+}
+
 has_dropin_include() {
     grep -Eq "^[[:space:]]*Include[[:space:]]+$DROPIN_DIR/\*\.conf" "$SSHD_CONFIG"
 }
@@ -160,8 +169,9 @@ configure_sshd() {
     log "ForceCommand set in $where (backup: $SSHD_CONFIG.acsle.bak)"
 }
 
+# Returns 1 if there was nothing to remove, so the caller can skip the restart
 unconfigure_sshd() {
-    [ -f "$SSHD_CONFIG" ] || return 0
+    has_sshd_config || return 1
     cp -p "$SSHD_CONFIG" "$SSHD_CONFIG.acsle.bak"
     remove_sshd_config
     if ! sshd_test; then
@@ -194,13 +204,12 @@ restart_sshd() {
 }
 
 if [ "$UNINSTALL" -eq 1 ]; then
-    if [ "$DO_SSHD" -eq 1 ]; then
-        unconfigure_sshd
+    if [ "$DO_SSHD" -eq 1 ] && unconfigure_sshd; then
         restart_sshd
     fi
     if [ "$DO_FILES" -eq 1 ]; then
         rm -rf "$LIBDIR"
-        rm -f "$PREFIX/bin/acsle" /etc/acsle/acsle.conf.new
+        rm -f "$PREFIX/bin/acsle" "$PREFIX/bin/acsle-record" /etc/acsle/acsle.conf.new
         if [ "$PURGE" -eq 1 ]; then
             rm -rf /etc/acsle /var/log/ttylog /var/log/analyze_cont /var/log/annotator
             log "removed files, config and logs"
@@ -229,4 +238,6 @@ if [ "$DO_SSHD" -eq 1 ]; then
     restart_sshd
     warn "every new SSH login now goes through $LIBDIR/script.sh."
     warn "keep this session open until a fresh login works."
+elif [ "$DO_FILES" -eq 1 ]; then
+    log "sshd config not changed; run 'acsle-record' (as yourself, not root) to record this session"
 fi

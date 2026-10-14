@@ -355,6 +355,8 @@ while(true)
  	#read file in while loop
 	# csv-> getline method returns an array reference
 	while (my $row = $csv->getline ($FH) ) {
+		# Skip the header row (column names) at the top of the CSV
+		next if $row->[0] eq 'id' && $row->[1] eq 'node';
 		if (length($row) > 0) {
 			processline($row);
 		}
